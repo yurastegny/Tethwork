@@ -1,0 +1,458 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00104AD12D8B66F410995A96 /* ColumnsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F525E61421E805F9A0B9EC /* ColumnsBrowserView.swift */; };
+		16A0CA7A35929EEFE2745185 /* TrashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7D048DFE0E7E6454BED764A /* TrashView.swift */; };
+		247F43AA2862542712EFFB7F /* MenuBarStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40A888D9AB5C71293DC /* MenuBarStatusView.swift */; };
+		26443150813F1695975D2BDC /* FileBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CADF9589D4C32D9B9E63806E /* FileBrowserView.swift */; };
+		330A76D5E85F2DF2F7ADDF76 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09161A0B79D0324D4D11E10 /* WelcomeView.swift */; };
+		54E6AA76EE4F415FEC5053C8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A915D9618E2509BB19221ABE /* SettingsView.swift */; };
+		617DE7238594D6626C786E76 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184B3EF2D73FA691D17E768A /* ContentView.swift */; };
+		85D9F151C1D075594903182F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 098D25C05F05440D7E36FD85 /* AppModel.swift */; };
+		88F896BC8941AE72CD59E530 /* ToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A4FF7E503E9049D38AD260 /* ToolbarView.swift */; };
+		8C136BD1E3BE78C0A0A681FE /* QuickLook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F9A7632A8445B4B493A7B4D /* QuickLook.framework */; };
+		915AA410C4A0FF3A3F1F90DB /* QuickLookThumbnailing.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0AD7FB864B760811C6E4BBE /* QuickLookThumbnailing.framework */; };
+		9697444FD16314A65BC8A742 /* InlineRenameField.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC507AD092A263EC86A7F7A6 /* InlineRenameField.swift */; };
+		978BC5E7A58DE71EBB5BFD37 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6C85C1C2B874E21941DFCF /* ConfigStore.swift */; };
+		99533407E30A4DE4EF179D51 /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41BBC371F4B310DC14556090 /* SyncEngine.swift */; };
+		9C2A6652A27827AE0251CF20 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B41253FB474E1D6F28244D88 /* Assets.xcassets */; };
+		AB9AE184E1B16E5E50254130 /* BrowserScrollSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91B6783339390CAD2353DB02 /* BrowserScrollSupport.swift */; };
+		B133B9349DF1D7DF5982D285 /* QuickLookSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF3D02D8BA74219EF7B98E9 /* QuickLookSupport.swift */; };
+		CC8ED01FFD796D9F262599E1 /* DirectoryWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A376CD8E770F79A4524A43 /* DirectoryWatcher.swift */; };
+		D197EA65B2935447C89BC1C4 /* KeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A6B00961C3604A96307EC7F /* KeyMonitor.swift */; };
+		D1FF34C745729C6BF1DAB035 /* ConnectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0C5153C624A549DFB171063 /* ConnectSheet.swift */; };
+		EC10C593F1FAEE0A6BBCB356 /* MarqueeSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B54F6A22DA7174084DF6174B /* MarqueeSelection.swift */; };
+		EEE066D133E844078A280C3E /* QuickLookUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7068FA97566D5C3A87E01CDB /* QuickLookUI.framework */; };
+		F0BB6208D037FCC6A92953AD /* TethworkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6E77EF71933AFAB6BCD9D0 /* TethworkApp.swift */; };
+		F752FF6208DD356BAD51517D /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F903E18E50E968302027D42A /* SidebarView.swift */; };
+		F8579DDDDC206B3D0210B1BE /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F217B8C1BE7FAB3891987A15 /* Models.swift */; };
+		FC58DAEE1187AE221A6522E3 /* TrashStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3141077442871AC9DF5A3F7E /* TrashStore.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		04F525E61421E805F9A0B9EC /* ColumnsBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnsBrowserView.swift; sourceTree = "<group>"; };
+		098D25C05F05440D7E36FD85 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		10CA4E30BDA64831CBE67D87 /* Tethwork.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tethwork.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		184B3EF2D73FA691D17E768A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		1B6C85C1C2B874E21941DFCF /* ConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigStore.swift; sourceTree = "<group>"; };
+		1F9A7632A8445B4B493A7B4D /* QuickLook.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLook.framework; path = System/Library/Frameworks/QuickLook.framework; sourceTree = SDKROOT; };
+		3141077442871AC9DF5A3F7E /* TrashStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrashStore.swift; sourceTree = "<group>"; };
+		32A4FF7E503E9049D38AD260 /* ToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarView.swift; sourceTree = "<group>"; };
+		41BBC371F4B310DC14556090 /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
+		5A6B00961C3604A96307EC7F /* KeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyMonitor.swift; sourceTree = "<group>"; };
+		7068FA97566D5C3A87E01CDB /* QuickLookUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLookUI.framework; path = System/Library/Frameworks/QuickLookUI.framework; sourceTree = SDKROOT; };
+		774A3EA855657B2F201ECD93 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		77A376CD8E770F79A4524A43 /* DirectoryWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryWatcher.swift; sourceTree = "<group>"; };
+		91B6783339390CAD2353DB02 /* BrowserScrollSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserScrollSupport.swift; sourceTree = "<group>"; };
+		A915D9618E2509BB19221ABE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B0C5153C624A549DFB171063 /* ConnectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectSheet.swift; sourceTree = "<group>"; };
+		B14DB40A888D9AB5C71293DC /* MenuBarStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusView.swift; sourceTree = "<group>"; };
+		B41253FB474E1D6F28244D88 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B54F6A22DA7174084DF6174B /* MarqueeSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeSelection.swift; sourceTree = "<group>"; };
+		BAF3D02D8BA74219EF7B98E9 /* QuickLookSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLookSupport.swift; sourceTree = "<group>"; };
+		C09161A0B79D0324D4D11E10 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		C7D048DFE0E7E6454BED764A /* TrashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrashView.swift; sourceTree = "<group>"; };
+		CADF9589D4C32D9B9E63806E /* FileBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileBrowserView.swift; sourceTree = "<group>"; };
+		D08093B0C5F810240C047FDE /* Tethwork.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Tethwork.entitlements; sourceTree = "<group>"; };
+		DA6E77EF71933AFAB6BCD9D0 /* TethworkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TethworkApp.swift; sourceTree = "<group>"; };
+		E0AD7FB864B760811C6E4BBE /* QuickLookThumbnailing.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLookThumbnailing.framework; path = System/Library/Frameworks/QuickLookThumbnailing.framework; sourceTree = SDKROOT; };
+		EC507AD092A263EC86A7F7A6 /* InlineRenameField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineRenameField.swift; sourceTree = "<group>"; };
+		F217B8C1BE7FAB3891987A15 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		F903E18E50E968302027D42A /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7632D66AE769F2740E61B6DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8C136BD1E3BE78C0A0A681FE /* QuickLook.framework in Frameworks */,
+				915AA410C4A0FF3A3F1F90DB /* QuickLookThumbnailing.framework in Frameworks */,
+				EEE066D133E844078A280C3E /* QuickLookUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		23F25007F0A4D68792EE0BB2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				10CA4E30BDA64831CBE67D87 /* Tethwork.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		2757355504E8C86D662A7B0D /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				098D25C05F05440D7E36FD85 /* AppModel.swift */,
+				91B6783339390CAD2353DB02 /* BrowserScrollSupport.swift */,
+				1B6C85C1C2B874E21941DFCF /* ConfigStore.swift */,
+				5A6B00961C3604A96307EC7F /* KeyMonitor.swift */,
+				BAF3D02D8BA74219EF7B98E9 /* QuickLookSupport.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		318803D7990BD9BBAB17E9AA /* Tethwork */ = {
+			isa = PBXGroup;
+			children = (
+				774A3EA855657B2F201ECD93 /* Info.plist */,
+				D08093B0C5F810240C047FDE /* Tethwork.entitlements */,
+				DA6E77EF71933AFAB6BCD9D0 /* TethworkApp.swift */,
+				92A3113444C7AB388830C4B6 /* Models */,
+				4232469E12D9774BD7C1BAE5 /* Resources */,
+				2757355504E8C86D662A7B0D /* Services */,
+				3AFA43D6754504E29F41DAA1 /* Sync */,
+				F5613F7318EF81262223BEFB /* Views */,
+			);
+			path = Tethwork;
+			sourceTree = "<group>";
+		};
+		3AFA43D6754504E29F41DAA1 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				77A376CD8E770F79A4524A43 /* DirectoryWatcher.swift */,
+				41BBC371F4B310DC14556090 /* SyncEngine.swift */,
+				3141077442871AC9DF5A3F7E /* TrashStore.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		4232469E12D9774BD7C1BAE5 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B41253FB474E1D6F28244D88 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		5125E8062D7674360C313880 = {
+			isa = PBXGroup;
+			children = (
+				318803D7990BD9BBAB17E9AA /* Tethwork */,
+				9FF29FFC3EF0B61A06B1E2AE /* Frameworks */,
+				23F25007F0A4D68792EE0BB2 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		92A3113444C7AB388830C4B6 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F217B8C1BE7FAB3891987A15 /* Models.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		9FF29FFC3EF0B61A06B1E2AE /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1F9A7632A8445B4B493A7B4D /* QuickLook.framework */,
+				E0AD7FB864B760811C6E4BBE /* QuickLookThumbnailing.framework */,
+				7068FA97566D5C3A87E01CDB /* QuickLookUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		F5613F7318EF81262223BEFB /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				04F525E61421E805F9A0B9EC /* ColumnsBrowserView.swift */,
+				B0C5153C624A549DFB171063 /* ConnectSheet.swift */,
+				184B3EF2D73FA691D17E768A /* ContentView.swift */,
+				CADF9589D4C32D9B9E63806E /* FileBrowserView.swift */,
+				EC507AD092A263EC86A7F7A6 /* InlineRenameField.swift */,
+				B54F6A22DA7174084DF6174B /* MarqueeSelection.swift */,
+				B14DB40A888D9AB5C71293DC /* MenuBarStatusView.swift */,
+				A915D9618E2509BB19221ABE /* SettingsView.swift */,
+				F903E18E50E968302027D42A /* SidebarView.swift */,
+				32A4FF7E503E9049D38AD260 /* ToolbarView.swift */,
+				C7D048DFE0E7E6454BED764A /* TrashView.swift */,
+				C09161A0B79D0324D4D11E10 /* WelcomeView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C4C2EBF2F5AE8C6DDACDF9E2 /* Tethwork */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 28BD9EECCB780D71DE647595 /* Build configuration list for PBXNativeTarget "Tethwork" */;
+			buildPhases = (
+				96842F1AD3267B8F5C4D40B7 /* Sources */,
+				B7875563D2FB141333A59BBB /* Resources */,
+				7632D66AE769F2740E61B6DC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Tethwork;
+			packageProductDependencies = (
+			);
+			productName = Tethwork;
+			productReference = 10CA4E30BDA64831CBE67D87 /* Tethwork.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7FB1CB9272CF3AF952FFC649 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 454578475F04A6B55AA04C58 /* Build configuration list for PBXProject "Tethwork" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 5125E8062D7674360C313880;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 23F25007F0A4D68792EE0BB2 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C4C2EBF2F5AE8C6DDACDF9E2 /* Tethwork */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B7875563D2FB141333A59BBB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9C2A6652A27827AE0251CF20 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		96842F1AD3267B8F5C4D40B7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				85D9F151C1D075594903182F /* AppModel.swift in Sources */,
+				AB9AE184E1B16E5E50254130 /* BrowserScrollSupport.swift in Sources */,
+				00104AD12D8B66F410995A96 /* ColumnsBrowserView.swift in Sources */,
+				978BC5E7A58DE71EBB5BFD37 /* ConfigStore.swift in Sources */,
+				D1FF34C745729C6BF1DAB035 /* ConnectSheet.swift in Sources */,
+				617DE7238594D6626C786E76 /* ContentView.swift in Sources */,
+				CC8ED01FFD796D9F262599E1 /* DirectoryWatcher.swift in Sources */,
+				26443150813F1695975D2BDC /* FileBrowserView.swift in Sources */,
+				9697444FD16314A65BC8A742 /* InlineRenameField.swift in Sources */,
+				D197EA65B2935447C89BC1C4 /* KeyMonitor.swift in Sources */,
+				EC10C593F1FAEE0A6BBCB356 /* MarqueeSelection.swift in Sources */,
+				247F43AA2862542712EFFB7F /* MenuBarStatusView.swift in Sources */,
+				F8579DDDDC206B3D0210B1BE /* Models.swift in Sources */,
+				B133B9349DF1D7DF5982D285 /* QuickLookSupport.swift in Sources */,
+				54E6AA76EE4F415FEC5053C8 /* SettingsView.swift in Sources */,
+				F752FF6208DD356BAD51517D /* SidebarView.swift in Sources */,
+				99533407E30A4DE4EF179D51 /* SyncEngine.swift in Sources */,
+				F0BB6208D037FCC6A92953AD /* TethworkApp.swift in Sources */,
+				88F896BC8941AE72CD59E530 /* ToolbarView.swift in Sources */,
+				FC58DAEE1187AE221A6522E3 /* TrashStore.swift in Sources */,
+				16A0CA7A35929EEFE2745185 /* TrashView.swift in Sources */,
+				330A76D5E85F2DF2F7ADDF76 /* WelcomeView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		16859C60BECBB8C42BAE75B7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				AD_HOC_CODE_SIGNING_ALLOWED = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Tethwork/Tethwork.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Tethwork/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = app.tethwork.Tethwork;
+				PRODUCT_NAME = Tethwork;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		5C7E740387F342225CA01B52 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		740917495658E0E3BE831AA1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				AD_HOC_CODE_SIGNING_ALLOWED = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Tethwork/Tethwork.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Tethwork/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = app.tethwork.Tethwork;
+				PRODUCT_NAME = Tethwork;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		BE3409B6540BF433C73F9798 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		28BD9EECCB780D71DE647595 /* Build configuration list for PBXNativeTarget "Tethwork" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				740917495658E0E3BE831AA1 /* Debug */,
+				16859C60BECBB8C42BAE75B7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		454578475F04A6B55AA04C58 /* Build configuration list for PBXProject "Tethwork" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C7E740387F342225CA01B52 /* Debug */,
+				BE3409B6540BF433C73F9798 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 7FB1CB9272CF3AF952FFC649 /* Project object */;
+}
