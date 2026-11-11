@@ -6,7 +6,7 @@
 
 A native macOS **SwiftUI** app — a network volume browser with selective sync.
 
-Current version: **0.0.1 beta** (build 1).
+[Release notes and versions](https://github.com/yurastegny/Tethwork/releases)
 
 > [!WARNING]
 > **Beta software — use at your own risk.** Synchronization can overwrite or delete
