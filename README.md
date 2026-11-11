@@ -1,8 +1,25 @@
+<p align="center">
+  <img src="docs/images/logo.webp" alt="Tethwork logo" width="128" height="128">
+</p>
+
 # Tethwork
 
 A native macOS **SwiftUI** app — a network volume browser with selective sync.
 
 Current version: **0.0.1 beta** (build 1).
+
+> [!WARNING]
+> **Beta software — use at your own risk.** Synchronization can overwrite or delete
+> files on both your Mac and the network volume. Keep independent, tested backups
+> before using Tethwork; synchronization and the built-in Trash are not a backup.
+> The software is provided **“as is,” without warranties of any kind**. To the
+> maximum extent permitted by applicable law, the author and contributors accept
+> **no liability for data loss, deletion, corruption, or other damage** arising
+> from its use or inability to use it. See [LICENSE](LICENSE).
+
+## Screenshot
+
+![Tethwork browsing a network volume with selective synchronization](docs/images/screenshot.webp)
 
 ## Features
 
