@@ -1,13 +1,35 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- sparkle-sign-warning:
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
---><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
-  <channel>
-    <title>Tethwork updates</title>
-    <link>https://github.com/yurastegny/Tethwork/releases</link>
-    <description>Signed updates for Tethwork. Beta builds also accept the beta channel.</description>
-    <language>en</language>
-  </channel>
-</rss><!-- sparkle-signatures:
-edSignature: 2QimKbgNkeS2C+Nd24dg4yIdE05V+sswG1qKwqhpmCBFvgY3YRIqDM5+x+qmfjoleHpIXDzG6XZnZka2p1t3CQ==
-length: 641
+-->
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Tethwork updates</title>
+        <link>https://github.com/yurastegny/Tethwork/releases</link>
+        <description>Signed updates for Tethwork. Beta builds also accept the beta channel.</description>
+        <language>en</language>
+        <item>
+            <title>0.0.1</title>
+            <pubDate>Wed, 11 Nov 2026 22:41:29 +0500</pubDate>
+            <link>https://github.com/yurastegny/Tethwork</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/yurastegny/Tethwork/releases</sparkle:fullReleaseNotesLink>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>0.0.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Tethwork 0.0.1 beta (build 2)
+
+- Signed and notarized universal macOS application.
+- Sparkle update checks in the application and menu-bar menus.
+- Update installation waits for active synchronization to finish.
+
+Beta software: use at your own risk and keep independent backups.
+]]></description>
+            <enclosure url="https://github.com/yurastegny/Tethwork/releases/download/v0.0.1-beta.2/Tethwork-0.0.1-beta.2.zip" length="5350155" type="application/octet-stream" sparkle:edSignature="HM5URrYkzewD3felRqwlHnsQcz+M6Y8H2wNZx1rX6QZXD2d3ELamRcPXaNgoV0BNN7p42IXwW1nOarJIcZ1UDA=="/>
+        </item>
+    </channel>
+</rss>
+<!-- sparkle-signatures:
+edSignature: c+cNwBt9i7BqhrU1Isf2oREsCuHYIvHwo4b2dVgb5KKaOr7j1ZDFySiVS6YOzBKQvmvPx0xNPhIzjAzChaNTBg==
+length: 1878
 -->
