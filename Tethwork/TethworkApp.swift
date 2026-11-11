@@ -1,8 +1,11 @@
 import SwiftUI
 
 final class TethworkApplicationDelegate: NSObject, NSApplicationDelegate {
+    var updater: AppUpdater?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSLog("Tethwork launched (pid %d)", ProcessInfo.processInfo.processIdentifier)
+        updater?.start()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -19,12 +22,17 @@ struct TethworkApp: App {
     @NSApplicationDelegateAdaptor(TethworkApplicationDelegate.self) private var applicationDelegate
     @StateObject private var appModel: AppModel
     @StateObject private var menuBarController: MenuBarStatusController
+    @StateObject private var updater: AppUpdater
 
     init() {
         let model = AppModel()
+        let updater = AppUpdater(model: model)
         _appModel = StateObject(wrappedValue: model)
+        _updater = StateObject(wrappedValue: updater)
         _menuBarController = StateObject(wrappedValue: MenuBarStatusController(
-            model: model, installsStatusItem: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil))
+            model: model, installsStatusItem: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
+            checkForUpdates: updater.checkForUpdates, updateAvailability: updater.$canCheckForUpdates.eraseToAnyPublisher()))
+        applicationDelegate.updater = updater
     }
 
     var body: some Scene {
@@ -49,6 +57,9 @@ struct TethworkApp: App {
         .defaultSize(width: 1100, height: 700)
         .windowResizability(.contentMinSize)
         .commands {
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(updater: updater)
+            }
             CommandGroup(replacing: .newItem) {
                 Button("New Connection…") {
                     appModel.showConnectSheet = true

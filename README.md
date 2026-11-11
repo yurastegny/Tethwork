@@ -28,6 +28,7 @@ A native macOS **SwiftUI** app — a network volume browser with selective sync.
 - Two-way sync of changes
 - Server-side Trash: deleted files stay on the volume for 15 days and can be restored
 - Concurrent background synchronization of all connections and session restore
+- Signed Sparkle update checks in the application menu and menu-bar dropdown
 
 ## Requirements
 
@@ -231,8 +232,9 @@ for permissions, locking, dropped connections and multi-Mac races.
 
 ## Signing and distribution
 
-Local builds use ad-hoc signing; hardened runtime is intentionally disabled for
-that configuration. The app is not sandboxed and only accesses folders selected
+Debug builds use ad-hoc signing with hardened runtime disabled; Release archives
+enable hardened runtime and must be signed with a Developer ID for distribution.
+The app is not sandboxed and only accesses folders selected
 by the user. macOS privacy prompts still apply to protected and network folders.
 
 For distribution, supply your own Developer ID and Team ID without committing
@@ -248,6 +250,52 @@ xcodebuild -project Tethwork.xcodeproj -scheme Tethwork -configuration Release \
 Export with Developer ID, submit the signed ZIP/DMG using `xcrun notarytool submit
 --keychain-profile YOUR_PROFILE --wait`, then `xcrun stapler staple` the app/DMG.
 No certificate, credentials or notarization approval are included in this repo.
+
+### Sparkle updates
+
+Sparkle 2.10.1 is pinned through Swift Package Manager. Its [license and third-party
+notices](Tethwork/Resources/Sparkle-LICENSE.txt) are included in the application.
+The HTTPS feed is [`updates/appcast.xml`](updates/appcast.xml). Both the feed and
+downloaded ZIP archives require Ed25519 signatures; archives are verified before
+extraction. The public key is embedded in `Info.plist`. The private key lives only
+in the login Keychain under the Sparkle account `app.tethwork.Tethwork` and must
+never be committed or uploaded. Keep a secure backup of this key outside Git.
+
+Sparkle asks permission for scheduled update checks; silent installation is off.
+Use **Check for Updates…** in the application menu or menu-bar dropdown for a
+manual check. Beta builds accept the `beta` channel as well as stable updates.
+Installing an update waits for active synchronization/initial upload to finish.
+Increase `CURRENT_PROJECT_VERSION` for every distributed build, even when the
+marketing version is unchanged. Builds made before Sparkle was added need a
+one-time manual installation of a Sparkle-enabled release.
+
+### Publishing a notarized release
+
+1. Create a universal Release archive using the Developer ID command above with
+   `ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO DEVELOPMENT_TEAM=YOUR_TEAM_ID`.
+2. Open the `.xcarchive` in Xcode Organizer and choose **Distribute App → Direct
+   Distribution** (or **Developer ID → Upload**). Wait for Apple's notarization
+   to succeed, then **Export Notarized App**. Alternatively, submit the archive
+   using a locally stored `notarytool` profile and staple the accepted app.
+3. Resolve Swift packages and locate Sparkle's `bin` directory under
+   `<DerivedData>/SourcePackages/artifacts/sparkle/Sparkle/bin`, then run:
+
+   ```bash
+   python3 scripts/package_release.py /path/to/notarized/Tethwork.app \
+     --sparkle-bin /path/to/SourcePackages/artifacts/sparkle/Sparkle/bin
+   ```
+
+   This refuses unnotarized, unstapled, incorrectly signed or non-universal apps.
+   It verifies the Keychain key matches the embedded public key, creates a ZIP
+   preserving framework symlinks, signs the archive and feed, and emits SHA-256
+   checksums. Output is under `build/releases/<tag>/`, outside Git.
+4. Publish the ZIP and `SHA256SUMS` in the matching GitHub Release. Beta builds
+   use `v<version>-beta.<build>` and must be marked as a prerelease. Only **after**
+   the asset is available, copy the generated `appcast.xml` into `updates/`,
+   commit and push. Do not edit signed XML by hand; regenerate/re-sign it.
+
+Developer ID signing and Apple notarization are separate from Sparkle signing.
+Do not publish ad-hoc signed development builds as notarized releases.
 
 ## License
 

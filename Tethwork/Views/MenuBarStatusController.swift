@@ -14,6 +14,8 @@ final class MenuBarStatusController: NSObject, ObservableObject, NSMenuDelegate 
     private let model: AppModel
     private let statusItem: NSStatusItem?
     private var subscription: AnyCancellable?
+    private var updateSubscription: AnyCancellable?
+    private var updateAction: (() -> Void)?
     private var refreshScheduled = false
     private var tracking = false
     private var trackingPauseOptions = false
@@ -25,7 +27,8 @@ final class MenuBarStatusController: NSObject, ObservableObject, NSMenuDelegate 
     private let resume = NSMenuItem()
     private let pause = NSMenuItem()
 
-    init(model: AppModel, installsStatusItem: Bool = true) {
+    init(model: AppModel, installsStatusItem: Bool = true,
+         checkForUpdates: (() -> Void)? = nil, updateAvailability: AnyPublisher<Bool, Never>? = nil) {
         self.model = model
         statusItem = installsStatusItem ? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength) : nil
         super.init()
@@ -56,6 +59,15 @@ final class MenuBarStatusController: NSObject, ObservableObject, NSMenuDelegate 
         }
         pause.submenu = options
         menu.addItem(pause)
+        if let checkForUpdates {
+            updateAction = checkForUpdates
+            let update = add(String(localized: "Check for Updates…"), action: #selector(checkUpdates))
+            update.identifier = NSUserInterfaceItemIdentifier("updates")
+            update.isEnabled = false
+            updateSubscription = updateAvailability?.receive(on: DispatchQueue.main).sink { [weak update] in
+                update?.isEnabled = $0
+            }
+        }
         let quit = add(String(localized: "Quit Tethwork"), action: #selector(Self.quit))
         quit.keyEquivalent = "q"
         quit.keyEquivalentModifierMask = .command
@@ -147,6 +159,7 @@ final class MenuBarStatusController: NSObject, ObservableObject, NSMenuDelegate 
     }
 
     @objc private func resumeSync() { model.resumeSync() }
+    @objc private func checkUpdates() { updateAction?() }
     @objc private func pauseSync(_ sender: NSMenuItem) { model.pauseSync(hours: Double(sender.tag)) }
     @objc private func quit() { NSApp.terminate(nil) }
 

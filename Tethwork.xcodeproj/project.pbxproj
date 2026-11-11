@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		00104AD12D8B66F410995A96 /* ColumnsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F525E61421E805F9A0B9EC /* ColumnsBrowserView.swift */; };
 		16A0CA7A35929EEFE2745185 /* TrashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7D048DFE0E7E6454BED764A /* TrashView.swift */; };
+		1A4463A8AD8F1349C8696F2D /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33AA04C62CBC04271DBD1734 /* AppUpdater.swift */; };
 		26443150813F1695975D2BDC /* FileBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CADF9589D4C32D9B9E63806E /* FileBrowserView.swift */; };
 		330A76D5E85F2DF2F7ADDF76 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09161A0B79D0324D4D11E10 /* WelcomeView.swift */; };
 		54E6AA76EE4F415FEC5053C8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A915D9618E2509BB19221ABE /* SettingsView.swift */; };
@@ -20,7 +21,9 @@
 		85D9F151C1D075594903182F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 098D25C05F05440D7E36FD85 /* AppModel.swift */; };
 		88F896BC8941AE72CD59E530 /* ToolbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A4FF7E503E9049D38AD260 /* ToolbarView.swift */; };
 		8C136BD1E3BE78C0A0A681FE /* QuickLook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F9A7632A8445B4B493A7B4D /* QuickLook.framework */; };
+		8C5A41A7CAA39AE6B2E3563A /* Sparkle-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = B0BE92B6942A958CCFDAA15A /* Sparkle-LICENSE.txt */; };
 		915AA410C4A0FF3A3F1F90DB /* QuickLookThumbnailing.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0AD7FB864B760811C6E4BBE /* QuickLookThumbnailing.framework */; };
+		95E4564BD31DCAF650FA9A14 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = E72350D360AF330B7F6E4676 /* Sparkle */; };
 		9697444FD16314A65BC8A742 /* InlineRenameField.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC507AD092A263EC86A7F7A6 /* InlineRenameField.swift */; };
 		978BC5E7A58DE71EBB5BFD37 /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6C85C1C2B874E21941DFCF /* ConfigStore.swift */; };
 		99533407E30A4DE4EF179D51 /* SyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41BBC371F4B310DC14556090 /* SyncEngine.swift */; };
@@ -62,6 +65,7 @@
 		1F9A7632A8445B4B493A7B4D /* QuickLook.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLook.framework; path = System/Library/Frameworks/QuickLook.framework; sourceTree = SDKROOT; };
 		3141077442871AC9DF5A3F7E /* TrashStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrashStore.swift; sourceTree = "<group>"; };
 		32A4FF7E503E9049D38AD260 /* ToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarView.swift; sourceTree = "<group>"; };
+		33AA04C62CBC04271DBD1734 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		3E6F61FA2CB5E7A3C95D4D55 /* InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = InfoPlist.strings; path = ru.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		41BBC371F4B310DC14556090 /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
 		4EE6E5CCB54433110B141442 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -75,6 +79,7 @@
 		9C99BE227871CEDD9DDB5997 /* TethworkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TethworkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A4517DEB24CE9A09FE60E693 /* MenuBarStatusController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarStatusController.swift; sourceTree = "<group>"; };
 		A915D9618E2509BB19221ABE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B0BE92B6942A958CCFDAA15A /* Sparkle-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Sparkle-LICENSE.txt"; sourceTree = "<group>"; };
 		B0C5153C624A549DFB171063 /* ConnectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectSheet.swift; sourceTree = "<group>"; };
 		B41253FB474E1D6F28244D88 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B54F6A22DA7174084DF6174B /* MarqueeSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeSelection.swift; sourceTree = "<group>"; };
@@ -96,6 +101,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				95E4564BD31DCAF650FA9A14 /* Sparkle in Frameworks */,
 				8C136BD1E3BE78C0A0A681FE /* QuickLook.framework in Frameworks */,
 				915AA410C4A0FF3A3F1F90DB /* QuickLookThumbnailing.framework in Frameworks */,
 				EEE066D133E844078A280C3E /* QuickLookUI.framework in Frameworks */,
@@ -118,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				098D25C05F05440D7E36FD85 /* AppModel.swift */,
+				33AA04C62CBC04271DBD1734 /* AppUpdater.swift */,
 				91B6783339390CAD2353DB02 /* BrowserScrollSupport.swift */,
 				1B6C85C1C2B874E21941DFCF /* ConfigStore.swift */,
 				CEAB90CD79B205D1801D283C /* ConnectionSyncCoordinator.swift */,
@@ -158,6 +165,7 @@
 				4EE6E5CCB54433110B141442 /* AppIcon.icon */,
 				B41253FB474E1D6F28244D88 /* Assets.xcassets */,
 				3E6F61FA2CB5E7A3C95D4D55 /* InfoPlist.strings */,
+				B0BE92B6942A958CCFDAA15A /* Sparkle-LICENSE.txt */,
 				396361B52EF20E2DF0DFA52A /* Localizable.strings */,
 			);
 			path = Resources;
@@ -254,6 +262,7 @@
 			);
 			name = Tethwork;
 			packageProductDependencies = (
+				E72350D360AF330B7F6E4676 /* Sparkle */,
 			);
 			productName = Tethwork;
 			productReference = 10CA4E30BDA64831CBE67D87 /* Tethwork.app */;
@@ -280,6 +289,9 @@
 			);
 			mainGroup = 5125E8062D7674360C313880;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				873D3E9D7EC647D70A8CD5A6 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 23F25007F0A4D68792EE0BB2 /* Products */;
 			projectDirPath = "";
@@ -300,6 +312,7 @@
 				9C2A6652A27827AE0251CF20 /* Assets.xcassets in Resources */,
 				5AED9190653A28EFF7F6E20E /* InfoPlist.strings in Resources */,
 				C07934958116CACAC702AEF8 /* Localizable.strings in Resources */,
+				8C5A41A7CAA39AE6B2E3563A /* Sparkle-LICENSE.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,6 +324,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				85D9F151C1D075594903182F /* AppModel.swift in Sources */,
+				1A4463A8AD8F1349C8696F2D /* AppUpdater.swift in Sources */,
 				AB9AE184E1B16E5E50254130 /* BrowserScrollSupport.swift in Sources */,
 				00104AD12D8B66F410995A96 /* ColumnsBrowserView.swift in Sources */,
 				978BC5E7A58DE71EBB5BFD37 /* ConfigStore.swift in Sources */,
@@ -396,7 +410,7 @@
 				CODE_SIGN_ENTITLEMENTS = Tethwork/Tethwork.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Tethwork/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
@@ -440,7 +454,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -524,7 +538,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -598,6 +612,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		873D3E9D7EC647D70A8CD5A6 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E72350D360AF330B7F6E4676 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 873D3E9D7EC647D70A8CD5A6 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7FB1CB9272CF3AF952FFC649 /* Project object */;
 }

@@ -13,7 +13,11 @@ settings:
     SWIFT_VERSION: "5.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     MARKETING_VERSION: "0.0.1"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
 targets:
   Tethwork:
     type: application
@@ -21,6 +25,7 @@ targets:
     sources:
       - path: Tethwork
     dependencies:
+      - package: Sparkle
       - sdk: QuickLook.framework
       - sdk: QuickLookThumbnailing.framework
       - sdk: QuickLookUI.framework
@@ -43,6 +48,9 @@ targets:
         ASSETCATALOG_COMPILER_STANDALONE_ICON_BEHAVIOR: all
         CODE_SIGN_IDENTITY: "-"
         AD_HOC_CODE_SIGNING_ALLOWED: true
+      configs:
+        Release:
+          ENABLE_HARDENED_RUNTIME: true
   TethworkTests:
     type: bundle.unit-test
     platform: macOS

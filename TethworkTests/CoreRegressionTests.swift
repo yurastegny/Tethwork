@@ -6,9 +6,51 @@ import QuickLookThumbnailing
 @testable import Tethwork
 
 final class CoreRegressionTests: XCTestCase {
+    @MainActor
+    func testUpdaterWaitsForSynchronizationBeforeInstalling() {
+        let suite = "app.tethwork.update-installation.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = AppModel(store: ConfigStore(defaults: defaults), startsSession: false)
+        let updater = AppUpdater(model: model)
+        XCTAssertTrue(updater.responds(to: NSSelectorFromString("updater:shouldPostponeRelaunchForUpdate:untilInvokingBlock:")),
+                      "Sparkle must actually call the safe-restart delegate")
+        XCTAssertTrue(updater.responds(to: NSSelectorFromString("allowedChannelsForUpdater:")))
+        var installations = 0
+        model.syncProgress = .init(done: 1, total: 2)
+        XCTAssertTrue(updater.postponeInstallationIfNeeded { installations += 1 })
+        updater.resumeInstallationIfIdle()
+        XCTAssertEqual(installations, 0)
+        model.syncProgress = nil
+        updater.resumeInstallationIfIdle()
+        updater.resumeInstallationIfIdle()
+        XCTAssertEqual(installations, 1, "A postponed installation must resume exactly once")
+        XCTAssertFalse(updater.postponeInstallationIfNeeded { installations += 1 })
+        XCTAssertEqual(installations, 1, "Sparkle, not the delegate, invokes the immediate installation")
+    }
+
+    func testUpdaterUsesSignedHTTPSUpdatesAndOptInBetaChannel() throws {
+        let bundle = Bundle.main
+        let feed = try XCTUnwrap(bundle.object(forInfoDictionaryKey: "SUFeedURL") as? String)
+        XCTAssertEqual(URL(string: feed)?.scheme, "https")
+        XCTAssertEqual(URL(string: feed)?.host, "raw.githubusercontent.com")
+        let publicKey = try XCTUnwrap(bundle.object(forInfoDictionaryKey: "SUPublicEDKey") as? String)
+        XCTAssertEqual(Data(base64Encoded: publicKey)?.count, 32)
+        XCTAssertEqual(bundle.object(forInfoDictionaryKey: "SUVerifyUpdateBeforeExtraction") as? Bool, true)
+        XCTAssertEqual(bundle.object(forInfoDictionaryKey: "SURequireSignedFeed") as? Bool, true)
+        XCTAssertEqual(bundle.object(forInfoDictionaryKey: "SUAutomaticallyUpdate") as? Bool, false)
+    }
+
+    @MainActor
+    func testOnlyBetaBuildsOptIntoBetaUpdates() {
+        XCTAssertEqual(AppUpdater.updateChannels(releaseChannel: "beta"), ["beta"])
+        XCTAssertTrue(AppUpdater.updateChannels(releaseChannel: nil).isEmpty)
+        XCTAssertTrue(AppUpdater.updateChannels(releaseChannel: "stable").isEmpty)
+    }
+
     func testBundleVersionAndReleaseChannel() {
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "0.0.1")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "1")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "2")
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "TethworkReleaseChannel") as? String, "beta")
     }
 

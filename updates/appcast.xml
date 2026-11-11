@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Tethwork updates</title>
+    <link>https://github.com/yurastegny/Tethwork/releases</link>
+    <description>Signed updates for Tethwork. Beta builds also accept the beta channel.</description>
+    <language>en</language>
+  </channel>
+</rss><!-- sparkle-signatures:
+edSignature: 2QimKbgNkeS2C+Nd24dg4yIdE05V+sswG1qKwqhpmCBFvgY3YRIqDM5+x+qmfjoleHpIXDzG6XZnZka2p1t3CQ==
+length: 641
+-->

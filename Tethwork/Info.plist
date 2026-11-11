@@ -20,6 +20,16 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>TethworkReleaseChannel</key>
 	<string>beta</string>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/yurastegny/Tethwork/main/updates/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>LvQcqCN0damNSkIPfk+oXdylW29OwALXIk4rv+NOFVU=</string>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
+	<key>SURequireSignedFeed</key>
+	<true/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>

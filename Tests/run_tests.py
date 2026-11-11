@@ -49,7 +49,9 @@ def main():
         "watcher": ["Tethwork/Sync/DirectoryWatcher.swift", "Tests/DirectoryWatcherTests.swift"],
         "coordinator": common + ["Tethwork/Services/ConnectionSyncCoordinator.swift", "Tests/ConnectionSyncCoordinatorTests.swift"],
         "startup": sorted(str(path.relative_to(repo)) for path in (repo / "Tethwork").rglob("*.swift")
-                          if path.name != "TethworkApp.swift") + ["Tests/AppStartupTests.swift"],
+                          # The standalone harness does not link Sparkle. Xcode
+                          # tests cover AppUpdater and its installation gate.
+                          if path.name not in {"TethworkApp.swift", "AppUpdater.swift"}) + ["Tests/AppStartupTests.swift"],
     }
     if args.suite != "all":
         suites = {args.suite: suites[args.suite]}
