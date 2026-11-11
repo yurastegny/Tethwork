@@ -41,6 +41,10 @@ struct FavoriteFolder: Identifiable, Codable, Hashable {
     var relativePath: String
 }
 
+enum FolderStorageState: String, Hashable, Sendable {
+    case checking, onlineOnly, partial, local, pending, unavailable
+}
+
 struct FileEntry: Identifiable, Hashable {
     var id: String { relativePath }
     var name: String
@@ -52,6 +56,10 @@ struct FileEntry: Identifiable, Hashable {
     var syncMode: SyncMode
     var isLocallyAvailable: Bool
     var syncStatus: SyncStatus
+    /// Descendants are pinned individually; the folder itself is not necessarily pinned.
+    var hasPinnedDescendants: Bool = false
+    /// Actual contents, independent of the policy for keeping future files.
+    var folderStorageState: FolderStorageState? = nil
 }
 
 /// Flattened list-view row (folder outline with indentation).
@@ -71,6 +79,7 @@ struct DirectoryListing {
     var relativePath: String
     var entries: [FileEntry]
     var breadcrumbs: [Breadcrumb]
+    var storageGeneration: UInt64 = 0
 }
 
 /// Where a trash item came from.
@@ -117,11 +126,66 @@ struct TrashItem: Identifiable, Codable, Hashable {
     }
 }
 
-enum SyncPhase: String {
+enum SyncPhase: String, Sendable {
     case preparing
     case checking
     case transferring
     case finishing
+}
+
+struct InitialUploadProgress: Equatable, Sendable {
+    var phase: SyncPhase
+    var filesDone: Int
+    var filesTotal: Int
+    var bytesDone: Int64
+    var bytesTotal: Int64?
+    var currentPath: String
+    var bytesPerSecond: Double?
+    var estimatedSecondsRemaining: Double?
+    /// Files changed by other apps during the pass. They are left for normal
+    /// sync instead of restarting the whole adoption.
+    var deferredFiles: Int = 0
+
+    var fraction: Double {
+        guard phase != .preparing else { return 0 }
+        let value: Double
+        if let bytesTotal, bytesTotal > 0 {
+            value = Double(bytesDone) / Double(bytesTotal)
+        } else if filesTotal > 0 {
+            value = Double(filesDone) / Double(filesTotal)
+        } else { return 0 }
+        return min(filesDone < filesTotal ? 0.99 : 1, max(0, value))
+    }
+}
+
+/// Estimate the slower of byte and file throughput over the last ~45 seconds.
+/// File throughput includes SMB per-file/metadata overhead, unlike link speed.
+struct TransferTimeEstimator {
+    private struct Sample {
+        var time: TimeInterval
+        var bytes: Int64
+        var files: Int
+    }
+    private var samples: [Sample] = []
+
+    mutating func estimate(bytesDone: Int64, filesDone: Int, bytesTotal: Int64, filesTotal: Int,
+                           elapsed: TimeInterval) -> TimeInterval? {
+        samples.append(Sample(time: elapsed, bytes: bytesDone, files: filesDone))
+        while samples.count > 1, samples[1].time <= elapsed - 45 { samples.removeFirst() }
+        guard let first = samples.first, elapsed - first.time >= 10 else { return nil }
+        let duration = elapsed - first.time
+        let remainingBytes = max(0, bytesTotal - bytesDone)
+        let remainingFiles = max(0, filesTotal - filesDone)
+        if remainingBytes == 0, remainingFiles == 0 { return 0 }
+        var estimates: [TimeInterval] = []
+        if remainingBytes > 0, bytesDone > first.bytes {
+            estimates.append(Double(remainingBytes) * duration / Double(bytesDone - first.bytes))
+        }
+        if remainingFiles > 0, filesDone > first.files {
+            estimates.append(Double(remainingFiles) * duration / Double(filesDone - first.files))
+        }
+        return estimates.max()
+    }
 }
 
 struct SyncEvent: Equatable {
@@ -135,6 +199,9 @@ struct SyncEvent: Equatable {
         case file
         /// An item was moved to Trash because its local copy disappeared.
         case trash
+        /// Last-write-wins replaced a differing copy; not a transport failure.
+        case conflict
+        case storage
         case error
         case status
         case complete
@@ -142,6 +209,10 @@ struct SyncEvent: Equatable {
 
     var kind: Kind
     var message: String
+    /// Prevent queued UI events from an old volume affecting the new selection.
+    var connectionID: String? = nil
+    var folderStorageState: FolderStorageState? = nil
+    var storageGeneration: UInt64 = 0
     var path: String?
     var progressDone: Int? = nil
     var progressTotal: Int? = nil
@@ -153,4 +224,7 @@ struct SyncEvent: Equatable {
     /// True only when the remote root itself cannot be reached. File-level sync
     /// errors must not make the whole connection look offline.
     var isRemoteUnavailable: Bool = false
+    /// A previously unavailable root has been read successfully again.
+    var isRemoteAvailable: Bool = false
+    var initialUploadProgress: InitialUploadProgress? = nil
 }

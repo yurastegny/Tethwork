@@ -43,6 +43,168 @@ struct TrashStoreTests {
     static func main() throws {
         let base = URL(fileURLWithPath: CommandLine.arguments[1])
         let cases: [Case] = [
+            Case(name: "SMB metadata ENOENT is harmless even when the name still exists") { f in
+                let item = try f.trash("document.txt")
+                let metadata = (TrashStore.trashRoot(remoteRoot: f.remote.path) as NSString).appendingPathComponent(".DS_Store")
+                try Data("stale server metadata".utf8).write(to: URL(fileURLWithPath: metadata))
+                try TrashStore.empty(remoteRoot: f.remote.path, remove: { path in
+                    if path == metadata {
+                        throw NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError,
+                                      userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: 2)])
+                    }
+                    try f.fm.removeItem(atPath: path)
+                })
+                try expect(!f.fm.fileExists(atPath: f.directory(item)), "Metadata blocked deletion of a real payload")
+                try expect(TrashStore.loadItems(remoteRoot: f.remote.path).isEmpty, "Deleted payload remained in the index")
+                var failure: TrashStore.DeletionError?
+                do {
+                    try TrashStore.empty(remoteRoot: f.remote.path, remove: { _ in
+                        throw NSError(domain: NSPOSIXErrorDomain, code: 13)
+                    })
+                } catch let error as TrashStore.DeletionError { failure = error }
+                try expect(failure?.failedIDs.contains(".DS_Store") == true, "Real metadata permission errors were hidden")
+            },
+            Case(name: "stale SMB listings do not turn missing metadata into a deletion failure") { f in
+                let name = ".DS_Store"
+                let staleListing: (String) throws -> [String] = { _ in [name] }
+                try expect(TrashStore.confirmedMissing(name, in: f.remote.path, list: staleListing),
+                           "A stale directory entry hid an explicit ENOENT")
+                let path = f.remote.appendingPathComponent(name)
+                try Data("metadata".utf8).write(to: path)
+                try expect(!TrashStore.confirmedMissing(name, in: f.remote.path, list: staleListing),
+                           "An existing file was treated as deleted")
+                try f.fm.removeItem(at: path)
+                try f.fm.createSymbolicLink(at: path, withDestinationURL: f.remote.appendingPathComponent("missing-target"))
+                try expect(!TrashStore.confirmedMissing(name, in: f.remote.path, list: staleListing),
+                           "A dangling symlink was treated as deleted")
+                try expect(!TrashStore.confirmedMissing("absent", in: f.remote.path, list: { _ in
+                    throw NSError(domain: NSPOSIXErrorDomain, code: 13)
+                }), "An unreadable parent was treated as successful deletion")
+            },
+            Case(name: "transient nested EBUSY is retried without changing the path") { _ in
+                let busy = NSError(domain: NSPOSIXErrorDomain, code: 16)
+                let wrapped = NSError(domain: NSCocoaErrorDomain, code: 512, userInfo: [NSUnderlyingErrorKey: busy])
+                var attempts = 0
+                var pauses: [TimeInterval] = []
+                try TrashStore.removeWithBusyRetry(atPath: "/test/payload", remove: { path in
+                    try expect(path == "/test/payload", "Retry changed the deletion target")
+                    attempts += 1
+                    if attempts < 3 { throw wrapped }
+                }, pause: { pauses.append($0) })
+                try expect(attempts == 3 && pauses == [0.15, 0.35], "Busy retry was not bounded/backed off")
+            },
+            Case(name: "permissions are not retried or mistaken for EBUSY") { _ in
+                var attempts = 0
+                var pauses = 0
+                var failure: Error?
+                do {
+                    try TrashStore.removeWithBusyRetry(atPath: "/test/payload", remove: { _ in
+                        attempts += 1
+                        throw NSError(domain: NSPOSIXErrorDomain, code: 13)
+                    }, pause: { _ in pauses += 1 })
+                } catch { failure = error }
+                try expect(failure != nil && attempts == 1 && pauses == 0, "Permission failure was retried or hidden")
+                try expect(!TrashStore.isBusyError(failure!), "EACCES was interpreted as a busy handle")
+            },
+            Case(name: "permanent busy failure retains metadata and still deletes accessible siblings") { f in
+                let busy = try f.trash("Nested/busy.png")
+                let allowed = try f.trash("allowed.txt")
+                var attempts = 0
+                var failure: TrashStore.DeletionError?
+                do {
+                    try TrashStore.deletePermanently(ids: [busy.id, allowed.id], remoteRoot: f.remote.path, remove: { path in
+                        if path == f.directory(busy) {
+                            attempts += 1
+                            throw NSError(domain: NSCocoaErrorDomain, code: 512,
+                                          userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: 16)])
+                        }
+                        try f.fm.removeItem(atPath: path)
+                    })
+                } catch let error as TrashStore.DeletionError { failure = error }
+                try expect(attempts == 4, "Busy retry count is unbounded or missing")
+                try expect(failure?.hasBusyItems == true && failure?.failedIDs == [busy.id], "Busy failure was not identified")
+                try expect(failure?.deletedIDs == [allowed.id], "Deletion stopped at the busy sibling")
+                let remaining = TrashStore.loadItems(remoteRoot: f.remote.path)
+                try expect(remaining.count == 1 && remaining[0].originalPath == "Nested/busy.png" && remaining[0].wasPinned,
+                           "Busy item lost its restore metadata")
+            },
+            Case(name: "Empty Trash retries a transient busy wrapper and updates the index") { f in
+                let item = try f.trash("screenshot.png")
+                var attempts = 0
+                try TrashStore.empty(remoteRoot: f.remote.path, remove: { path in
+                    if path == f.directory(item) {
+                        attempts += 1
+                        if attempts == 1 { throw NSError(domain: NSPOSIXErrorDomain, code: 16) }
+                    }
+                    try f.fm.removeItem(atPath: path)
+                })
+                try expect(attempts == 2, "Empty Trash did not retry the busy item")
+                try expect(TrashStore.loadItems(remoteRoot: f.remote.path).isEmpty, "Successful retry left a stale index record")
+            },
+            Case(name: "a colon in a real file name can be trashed and restored") { f in
+                let relative = "Fonts/_FONTS/Lemon:Milk"
+                let item = try f.trash(relative)
+                let original = f.remote.appendingPathComponent(relative)
+                try expect(!f.fm.fileExists(atPath: original.path), "Colon-named file was not moved to Trash")
+                let results = try TrashStore.restore(ids: [item.id], remoteRoot: f.remote.path)
+                try expect(results.map(\.restoredPath) == [relative], "Colon-named file was not restored to its path")
+                try expect(try String(contentsOf: original, encoding: .utf8) == relative,
+                           "Restored colon-named file has wrong contents")
+            },
+            Case(name: "restore rejects malicious paths and names from a shared index") { f in
+                for badPath in ["../outside/restored.txt", "/outside/restored.txt", "Nested/../../outside.txt", ".tethwork-trash/overwrite"] {
+                    var item = try f.trash("restore.txt")
+                    item.originalPath = badPath
+                    let data = try JSONSerialization.data(withJSONObject: [
+                        "version": 1,
+                        "items": [["id": item.id, "name": item.name, "originalPath": item.originalPath,
+                                   "isDirectory": false, "size": item.size,
+                                   "deletedAt": ISO8601DateFormatter().string(from: item.deletedAt), "wasPinned": true]]
+                    ])
+                    let index = URL(fileURLWithPath: TrashStore.trashRoot(remoteRoot: f.remote.path)).appendingPathComponent("index.json")
+                    try data.write(to: index)
+                    _ = try TrashStore.restore(ids: [item.id], remoteRoot: f.remote.path)
+                    try expect(!f.fm.fileExists(atPath: f.root.appendingPathComponent("outside/restored.txt").path), "Restore escaped its root")
+                    try expect(TrashStore.safeRelativePath(badPath) == nil, "Unsafe path passed validation")
+                }
+                for name in ["../evil.txt", "/tmp/evil.txt", "..", "bad\0name"] {
+                    try expect(!TrashStore.isValidName(name), "Unsafe payload name passed validation: \(name)")
+                }
+            },
+            Case(name: "restore cannot follow a parent symlink outside the volume") { f in
+                let item = try f.trash("Nested/file.txt")
+                try f.fm.removeItem(at: f.remote.appendingPathComponent("Nested"))
+                let outside = f.root.appendingPathComponent("outside")
+                try f.fm.createDirectory(at: outside, withIntermediateDirectories: true)
+                try f.fm.createSymbolicLink(at: f.remote.appendingPathComponent("Nested"), withDestinationURL: outside)
+                var failed = false
+                do { _ = try TrashStore.restore(ids: [item.id], remoteRoot: f.remote.path) }
+                catch { failed = true }
+                try expect(failed, "Unsafe restore reported success")
+                try expect(!f.fm.fileExists(atPath: outside.appendingPathComponent("file.txt").path), "Restore followed the symlink")
+                try expect(f.fm.fileExists(atPath: TrashStore.payloadPath(remoteRoot: f.remote.path, item: item)), "Rejected restore lost the payload")
+            },
+            Case(name: "batch trash reports index failures without losing moved payloads") { f in
+                _ = try f.trash("existing.txt")
+                let index = (TrashStore.trashRoot(remoteRoot: f.remote.path) as NSString).appendingPathComponent("index.json")
+                try f.fm.setAttributes([.immutable: true], ofItemAtPath: index)
+                defer { try? f.fm.setAttributes([.immutable: false], ofItemAtPath: index) }
+                try Data("new".utf8).write(to: f.remote.appendingPathComponent("new.txt"))
+                let result = TrashStore.moveToTrash(relativePaths: ["new.txt"], remoteRoot: f.remote.path, wasPinned: { _ in false })
+                try expect(result.moved.count == 1 && result.indexError != nil, "Batch concealed its index failure")
+                try expect(TrashStore.loadItems(remoteRoot: f.remote.path).count == 2, "Moved payload was not recoverable")
+            },
+            Case(name: "a symlinked Trash service folder cannot redirect writes outside the volume") { f in
+                let outside = f.root.appendingPathComponent("outside")
+                try f.fm.createDirectory(at: outside, withIntermediateDirectories: true)
+                try f.fm.createSymbolicLink(at: f.remote.appendingPathComponent(TrashStore.folderName), withDestinationURL: outside)
+                try Data("keep".utf8).write(to: f.remote.appendingPathComponent("file.txt"))
+                var failed = false
+                do { _ = try TrashStore.moveToTrash(relativePath: "file.txt", remoteRoot: f.remote.path, wasPinned: false) }
+                catch { failed = true }
+                try expect(failed, "Trash accepted a symlinked service directory")
+                try expect(try f.fm.contentsOfDirectory(atPath: outside.path).isEmpty, "Trash wrote outside its root")
+            },
             Case(name: "emptying preserves the trash container when its parent forbids removing it") { f in
                 _ = try f.trash("Nested/a.txt")
                 _ = try f.trash("Nested/b.txt")
@@ -55,7 +217,7 @@ struct TrashStoreTests {
                 try expect(before[.systemFileNumber] as? NSNumber == after[.systemFileNumber] as? NSNumber,
                            "Empty Trash removed or recreated its service directory")
                 try expect(TrashStore.loadItems(remoteRoot: f.remote.path).isEmpty, "Trash contents remain")
-                try expect(Set(try f.fm.contentsOfDirectory(atPath: root)) == ["index.json"], "Unexpected trash payloads remain")
+                try expect(Set(try f.fm.contentsOfDirectory(atPath: root)) == ["index.json", ".index.lock"], "Unexpected trash payloads remain")
                 let permissions = try f.fm.attributesOfItem(atPath: f.remote.path)[.posixPermissions] as? NSNumber
                 try expect(permissions?.intValue == 0o500, "Empty Trash modified access permissions")
             },
@@ -81,7 +243,7 @@ struct TrashStoreTests {
                 try Data("orphan".utf8).write(to: root.appendingPathComponent(".orphan"))
                 try f.fm.createSymbolicLink(at: root.appendingPathComponent("link"), withDestinationURL: outside)
                 try TrashStore.empty(remoteRoot: f.remote.path)
-                try expect(Set(try f.fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).map(\.lastPathComponent)) == ["index.json"],
+                try expect(Set(try f.fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).map(\.lastPathComponent)) == ["index.json", ".index.lock"],
                            "Empty Trash left hidden or unindexed payloads")
                 try expect(try String(contentsOf: outside, encoding: .utf8) == "retain", "Empty Trash followed a symlink outside the container")
             },

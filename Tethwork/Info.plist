@@ -15,16 +15,32 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>TethworkReleaseChannel</key>
+	<string>beta</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Tethwork needs access to your selected Desktop sync folder to keep files available on this Mac.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Tethwork needs access to your selected Documents sync folder to synchronize your files.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Tethwork needs access to your selected Downloads folder to import and synchronize your files.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>Tethwork reads and writes your selected network volume to synchronize files and manage recoverable Trash.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Tethwork needs access to selected removable volumes used for file synchronization.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
 </dict>
 </plist>

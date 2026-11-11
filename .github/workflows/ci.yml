@@ -1,0 +1,38 @@
+name: macOS CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode with Icon Composer support
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26'
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Build and XCTest
+        run: >-
+          xcodebuild -project Tethwork.xcodeproj -scheme Tethwork
+          -configuration Debug -destination 'platform=macOS'
+          -resultBundlePath build/Tests.xcresult test
+      - name: Isolated regression suites
+        run: python3 Tests/run_tests.py --compile-timeout 180 --run-timeout 120
+      - name: Thread Sanitizer
+        run: python3 Tests/run_tests.py --sanitize-thread --repeat 2 --compile-timeout 180 --run-timeout 120
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/Tests.xcresult

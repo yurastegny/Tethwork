@@ -27,16 +27,32 @@ struct TrashView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+            if showsErrorDetails, let error = model.trashErrorMessage {
+                ErrorDetailsPanel(title: "Trash operation failed", message: error) {
+                    showsErrorDetails = false
+                }
+            }
+
             bottomBar
         }
         .background(Color(nsColor: .controlBackgroundColor))
+        .onChange(of: model.trashErrorMessage) { _, error in
+            if error == nil { showsErrorDetails = false }
+        }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                if model.isTrashBusy {
-                    ProgressView()
-                        .controlSize(.small)
+            if model.isTrashBusy {
+                if #available(macOS 26.0, *) {
+                    ToolbarItem(placement: .primaryAction) {
+                        trashActivityIndicator
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                } else {
+                    ToolbarItem(placement: .primaryAction) {
+                        trashActivityIndicator
+                    }
                 }
-
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     model.restoreTrashSelection()
                 } label: {
@@ -83,6 +99,16 @@ struct TrashView: View {
         .onDeleteCommand {
             model.requestDeleteTrashSelection()
         }
+    }
+
+    private var trashActivityIndicator: some View {
+        ProgressView()
+            .progressViewStyle(.circular)
+            .controlSize(.small)
+            .fixedSize()
+            .frame(width: 28, height: 28)
+            .background(.regularMaterial, in: Circle())
+            .clipShape(Circle())
     }
 
     private var deleteButtonTitle: String {
@@ -153,7 +179,10 @@ struct TrashView: View {
                 url: model.trashURL(for: entry),
                 isDirectory: item.isDirectory,
                 size: 24,
-                isSelected: model.trashSelection.contains(entry.id)
+                isSelected: model.trashSelection.contains(entry.id),
+                // Do not open network Trash payloads merely to draw their icons:
+                // Quick Look's server handles can prevent permanent deletion.
+                allowsThumbnail: false
             )
             Text(item.name)
                 .lineLimit(1)
@@ -191,35 +220,12 @@ struct TrashView: View {
                     .help(error)
                     .textSelection(.enabled)
                 Button("Details…") {
-                    showsErrorDetails = true
+                    showsErrorDetails.toggle()
                 }
                 .buttonStyle(.borderless)
                 .fixedSize()
-                .popover(isPresented: $showsErrorDetails) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Trash operation failed")
-                            .font(.headline)
-                        ScrollView {
-                            Text(error)
-                                .font(.system(.body, design: .monospaced))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(height: 280)
-                        HStack {
-                            Button("Copy Error") {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(error, forType: .string)
-                            }
-                            Spacer()
-                            Button("Close") { showsErrorDetails = false }
-                        }
-                    }
-                    .padding(16)
-                    .frame(width: 540)
-                    .lineLimit(nil)
-                }
+                .help("Show or hide the full error")
+                .accessibilityLabel(Text("Show error details"))
             } else {
                 Text(model.statusMessage)
                     .foregroundStyle(.secondary)

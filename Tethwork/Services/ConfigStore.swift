@@ -13,9 +13,17 @@ final class ConfigStore {
     private let defaults: UserDefaults
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let pinsFileURL: URL?
+    private var cachedPins: [String: [String]]?
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, pinsFileURL: URL? = nil) {
         self.defaults = defaults
+        self.pinsFileURL = pinsFileURL ?? (defaults === UserDefaults.standard
+            ? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+                .appendingPathComponent("Tethwork/pinned-paths.json") : nil)
+        // Migrate before any other preferences are written: the old domain can
+        // exceed CFPreferences' 4 MB limit with individually adopted files.
+        if self.pinsFileURL != nil { _ = pinnedByConnection }
     }
 
     var pendingInitialMergeIDs: Set<String> {
@@ -66,17 +74,46 @@ final class ConfigStore {
 
     var pinnedByConnection: [String: [String]] {
         get {
+            if let cachedPins { return cachedPins }
+            if let pinsFileURL, let data = try? Data(contentsOf: pinsFileURL),
+               let value = try? decoder.decode([String: [String]].self, from: data) {
+                cachedPins = value
+                defaults.removeObject(forKey: pinnedKey)
+                return value
+            }
             guard let data = defaults.data(forKey: pinnedKey),
                   let value = try? decoder.decode([String: [String]].self, from: data)
             else { return [:] }
+            if let pinsFileURL {
+                // Never discard the legacy copy if writing the replacement fails.
+                if persistPins(data, to: pinsFileURL) { defaults.removeObject(forKey: pinnedKey) }
+                cachedPins = value
+            }
             return value
         }
         set {
             if let data = try? encoder.encode(newValue) {
-                defaults.set(data, forKey: pinnedKey)
+                if let pinsFileURL {
+                    guard persistPins(data, to: pinsFileURL) else { return }
+                    cachedPins = newValue
+                    defaults.removeObject(forKey: pinnedKey)
+                } else {
+                    defaults.set(data, forKey: pinnedKey)
+                }
             } else {
-                defaults.removeObject(forKey: pinnedKey)
+                NSLog("Tethwork could not encode pinned paths; retaining the previous selection")
             }
+        }
+    }
+
+    private func persistPins(_ data: Data, to url: URL) -> Bool {
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
+            return true
+        } catch {
+            NSLog("Tethwork could not save pinned paths: %@", error.localizedDescription)
+            return false
         }
     }
 
@@ -121,6 +158,10 @@ final class ConfigStore {
     }
 
     private let viewModeKey = "browserViewMode"
+    var showsHiddenFiles: Bool {
+        get { defaults.bool(forKey: "showsHiddenFiles") }
+        set { defaults.set(newValue, forKey: "showsHiddenFiles") }
+    }
 
     /// list | icons | columns
     var viewMode: String {

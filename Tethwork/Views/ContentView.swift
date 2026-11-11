@@ -11,7 +11,10 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
             Group {
-                if model.showingTrash {
+                if model.connectingConnectionID != nil && model.listing == nil {
+                    ProgressView("Connecting…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if model.showingTrash {
                     TrashView()
                 } else if model.activeConnection == nil {
                     WelcomeView()
@@ -19,6 +22,7 @@ struct ContentView: View {
                     MainBrowserView()
                 }
             }
+            .allowsHitTesting(model.connectingConnectionID == nil && !model.isLoadingDirectory)
             .frame(minWidth: 760, minHeight: 580)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(navigationTitle)
@@ -56,6 +60,9 @@ struct ContentView: View {
                 },
                 isBrowserActive: {
                     model.activeConnection != nil && !model.showingTrash
+                        && model.connectingConnectionID == nil
+                        && !model.isLoadingDirectory
+                        && !model.showConnectSheet && model.editingConnection == nil
                 }
             ))
         }
@@ -65,12 +72,16 @@ struct ContentView: View {
     }
 
     private var navigationTitle: String {
+        if let id = model.connectingConnectionID,
+           let connection = model.connections.first(where: { $0.id == id }) { return connection.name }
         if model.showingTrash { return "Trash" }
         if model.activeConnection == nil { return "Tethwork" }
         return model.currentFolderTitle
     }
 
     private var navigationSubtitle: String {
+        if let id = model.connectingConnectionID,
+           let connection = model.connections.first(where: { $0.id == id }) { return connection.remotePath }
         if model.showingTrash { return "All servers · kept for \(TrashStore.retentionDays) days" }
         guard let connection = model.activeConnection else { return "" }
         return connection.remotePath

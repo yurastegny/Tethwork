@@ -1,0 +1,5 @@
+"NSDesktopFolderUsageDescription" = "Tethwork требуется доступ к выбранной папке на рабочем столе для локального хранения файлов.";
+"NSDocumentsFolderUsageDescription" = "Tethwork требуется доступ к выбранной папке в Документах для синхронизации файлов.";
+"NSDownloadsFolderUsageDescription" = "Tethwork требуется доступ к выбранной папке Загрузки для импорта и синхронизации файлов.";
+"NSNetworkVolumesUsageDescription" = "Tethwork читает и записывает файлы на выбранном сетевом томе для синхронизации и работы с корзиной.";
+"NSRemovableVolumesUsageDescription" = "Tethwork требуется доступ к выбранным съёмным томам для синхронизации файлов.";

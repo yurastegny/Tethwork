@@ -77,12 +77,211 @@ struct InitialMergeTests {
     static func main() async throws {
         let base = URL(fileURLWithPath: CommandLine.arguments[1])
         let cases: [Case] = [
+            Case(name: "missing-source detection never hides permissions, existing links or a missing root") { f in
+                let missing = f.local.appendingPathComponent("journalAttr.1848")
+                let error = NSError(domain: NSCocoaErrorDomain, code: NSFileReadNoSuchFileError,
+                                    userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: 2)])
+                try expect(SyncEngine.isVanishedInitialMergeSource(error, path: missing.path, root: f.local.path),
+                           "A genuinely disappeared child was not recognized")
+                let permission = NSError(domain: NSCocoaErrorDomain, code: NSFileReadNoSuchFileError,
+                                         userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: 13)])
+                try expect(!SyncEngine.isVanishedInitialMergeSource(permission, path: missing.path, root: f.local.path),
+                           "An underlying permission failure was hidden")
+                try f.fm.createSymbolicLink(at: missing, withDestinationURL: f.local.appendingPathComponent("nonexistent-target"))
+                try expect(!SyncEngine.isVanishedInitialMergeSource(error, path: missing.path, root: f.local.path),
+                           "A dangling link was treated as an absent file")
+                try f.fm.removeItem(at: f.local)
+                try expect(!SyncEngine.isVanishedInitialMergeSource(error, path: missing.path, root: f.local.path),
+                           "A disconnected source root was treated as transient child removal")
+            },
+            Case(name: "rotated files disappearing after planning do not fail or pin missing sources") { f in
+                try f.write(f.local, "a-journalAttr.1848", "temporary upload")
+                try f.write(f.local, "b-matching-journal", "existing server copy")
+                try f.write(f.remote, "b-matching-journal", "existing server copy")
+                try f.write(f.local, "z-stable.txt", "keep this file")
+                let local = f.local
+                let paths = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection, onProgress: { done, _, _ in
+                    if done == 0 {
+                        try? FileManager.default.removeItem(at: local.appendingPathComponent("a-journalAttr.1848"))
+                        try? FileManager.default.removeItem(at: local.appendingPathComponent("b-matching-journal"))
+                    }
+                })
+                try expect(paths == ["z-stable.txt"], "A vanished source was adopted and would be downloaded again")
+                try expect(try f.read(f.remote, "z-stable.txt") == "keep this file", "A vanished journal stopped unrelated uploads")
+                try expect(try f.read(f.remote, "b-matching-journal") == "existing server copy", "A vanished source deleted existing server data")
+                try expect(!f.exists(f.remote, "a-journalAttr.1848"), "A missing journal was recreated on the server")
+            },
+            Case(name: "a source rotating during a chunked copy is skipped without publishing partial data") { f in
+                try f.write(f.local, "a-journalAttr.1848", String(repeating: "x", count: 2 * 1024 * 1024))
+                try f.write(f.local, "z-stable.txt", "stable")
+                let source = f.local.appendingPathComponent("a-journalAttr.1848")
+                let paths = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection, onTransferRate: nil, onSnapshot: { snapshot in
+                    if snapshot.phase == .transferring, snapshot.bytesDone == 0, snapshot.currentPath.isEmpty {
+                        Thread.sleep(forTimeInterval: 0.25)
+                    }
+                    if snapshot.phase == .transferring, snapshot.currentPath == "a-journalAttr.1848", snapshot.bytesDone > 0 {
+                        try? FileManager.default.removeItem(at: source)
+                    }
+                })
+                try expect(paths == ["z-stable.txt"], "A rotated in-flight source remained pinned")
+                try expect(!f.exists(f.remote, "a-journalAttr.1848"), "Partial contents were published")
+                try expect(f.exists(f.remote, "z-stable.txt"), "A rotated file blocked its stable sibling")
+                let names = try f.fm.contentsOfDirectory(atPath: f.remote.path)
+                try expect(!names.contains { $0.hasPrefix(".tethwork-copy-") }, "A rotated source left temporary payloads")
+            },
+            Case(name: "a journal disappearing during comparison leaves its server copy untouched") { f in
+                try f.write(f.local, "a-journalAttr.1848", "identical")
+                try f.write(f.remote, "a-journalAttr.1848", "identical")
+                try f.write(f.local, "z-stable.txt", "stable")
+                let source = f.local.appendingPathComponent("a-journalAttr.1848")
+                let observed = MergeEvents()
+                let paths = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection, onTransferRate: nil, onSnapshot: { snapshot in
+                    observed.add(.init(kind: .progress, message: "", path: snapshot.currentPath, initialUploadProgress: snapshot))
+                    if snapshot.phase == .checking, snapshot.bytesDone == 0, snapshot.currentPath.isEmpty {
+                        Thread.sleep(forTimeInterval: 0.25)
+                    }
+                    if snapshot.phase == .checking, snapshot.currentPath == "a-journalAttr.1848", snapshot.bytesDone == 0 {
+                        try? FileManager.default.removeItem(at: source)
+                    }
+                })
+                try expect(paths == ["z-stable.txt"], "Unexpected pins: \(paths); comparison snapshots: \(observed.snapshot().compactMap(\.initialUploadProgress).filter { $0.phase == .checking })")
+                try expect(try f.read(f.remote, "a-journalAttr.1848") == "identical", "Comparison removed a server copy")
+                try expect(f.exists(f.remote, "z-stable.txt"), "A comparison race blocked stable files")
+            },
+            Case(name: "matching existing files show comparison progress and ETA before any upload") { f in
+                let content = String(repeating: "x", count: 2 * 1024 * 1024)
+                try f.write(f.local, "existing.bin", content)
+                try f.write(f.remote, "existing.bin", content)
+                let snapshots = MergeEvents()
+                _ = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection, onTransferRate: nil, onSnapshot: { snapshot in
+                    snapshots.add(.init(kind: .progress, message: "", path: snapshot.currentPath, initialUploadProgress: snapshot))
+                    if snapshot.phase == .checking, snapshot.bytesDone == 0 {
+                        // Cross the real warm-up period, then a snapshot interval
+                        // at file start. This models the slow SMB comparison the
+                        // user sees without depending on network timing.
+                        Thread.sleep(forTimeInterval: snapshot.currentPath.isEmpty ? 10.1 : 0.25)
+                    }
+                    if snapshot.phase == .finishing, snapshot.bytesDone == 0, snapshot.currentPath.isEmpty {
+                        Thread.sleep(forTimeInterval: 0.25)
+                    }
+                })
+                let values = snapshots.snapshot().compactMap(\.initialUploadProgress)
+                try expect(values.contains {
+                    $0.phase == .checking && $0.filesDone == 0 && $0.bytesDone > 0 && $0.bytesDone < ($0.bytesTotal ?? 0) &&
+                    ($0.estimatedSecondsRemaining ?? 0) > 0
+                }, "A slow existing-file comparison still had no remaining-time estimate: " + values.map { "\($0.phase) d=\($0.filesDone) b=\($0.bytesDone)/\($0.bytesTotal ?? -1) eta=\($0.estimatedSecondsRemaining ?? -1)" }.joined(separator: " | "))
+                try expect(values.contains {
+                    $0.phase == .finishing && $0.bytesDone >= ($0.bytesTotal ?? 0) && ($0.bytesTotal ?? 0) > 0
+                }, "Final metadata verification did not report completed bytes")
+                try expect(values.filter { $0.phase == .transferring }.allSatisfy { $0.filesTotal == 0 },
+                           "Matching files were unnecessarily uploaded")
+            },
+            Case(name: "final checks trust the comparison and do not re-read a large matching file") { f in
+                let content = String(repeating: "x", count: 1024 * 1024)
+                try f.write(f.local, "existing.bin", content)
+                try f.write(f.remote, "existing.bin", content)
+                let localURL = f.local.appendingPathComponent("existing.bin")
+                let remoteURL = f.remote.appendingPathComponent("existing.bin")
+                defer {
+                    try? f.fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: localURL.path)
+                    try? f.fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: remoteURL.path)
+                }
+                let paths = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection, onTransferRate: nil, onSnapshot: { snapshot in
+                    if snapshot.phase == .transferring, snapshot.bytesDone == 0, snapshot.currentPath.isEmpty {
+                        // Comparison already proved equality: final checks must
+                        // not need to read file data again.
+                        try? f.fm.setAttributes([.posixPermissions: 0], ofItemAtPath: localURL.path)
+                        try? f.fm.setAttributes([.posixPermissions: 0], ofItemAtPath: remoteURL.path)
+                    }
+                })
+                try expect(paths == ["existing.bin"], "Metadata-only verification failed: \(paths)")
+                try? f.fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: localURL.path)
+                try expect(try f.read(f.local, "existing.bin") == content, "Local file changed")
+            },
+            Case(name: "initial upload byte progress advances before a large file finishes") { f in
+                try f.write(f.local, "large.bin", String(repeating: "x", count: 2 * 1024 * 1024))
+                let snapshots = MergeEvents()
+                _ = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection, onTransferRate: nil, onSnapshot: { snapshot in
+                    snapshots.add(.init(kind: .progress, message: "", path: snapshot.currentPath, initialUploadProgress: snapshot))
+                    // Deterministically cross a snapshot interval before copying,
+                    // without relying on disk speed or a huge fixture.
+                    if snapshot.phase == .transferring, snapshot.currentPath.isEmpty, snapshot.bytesDone == 0 {
+                        Thread.sleep(forTimeInterval: 0.25)
+                    }
+                })
+                try expect(snapshots.snapshot().compactMap(\.initialUploadProgress).contains {
+                    $0.phase == .transferring && $0.filesDone == 0 && $0.bytesDone > 0 && $0.bytesDone < ($0.bytesTotal ?? 0)
+                }, "A large file only updated its progress after completion")
+            },
+            Case(name: "initial upload snapshots distinguish counting, byte transfer and final checks") { f in
+                try f.write(f.local, "upload.txt", String(repeating: "x", count: 4096))
+                try f.write(f.local, "empty.txt", "")
+                try f.write(f.local, "matching.txt", "already uploaded")
+                try f.write(f.remote, "matching.txt", "already uploaded")
+                let snapshots = MergeEvents()
+                _ = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection, onTransferRate: nil, onSnapshot: { snapshot in
+                    snapshots.add(.init(kind: .progress, message: "", path: snapshot.currentPath, initialUploadProgress: snapshot))
+                })
+                let values = snapshots.snapshot().compactMap(\.initialUploadProgress)
+                try expect(values.first?.phase == .preparing && values.first?.bytesTotal == nil,
+                           "Counting fabricated a known total")
+                let transferred = values.last { $0.phase == .transferring }
+                try expect(transferred?.filesDone == 2 && transferred?.filesTotal == 2,
+                           "Matching files were counted as uploads")
+                try expect(transferred?.bytesDone == 4096 && transferred?.bytesTotal == 4096,
+                           "Uploaded byte counts disagree with the real files")
+                try expect(values.last?.phase == .finishing && values.last?.estimatedSecondsRemaining == nil,
+                           "Final verification was presented as remaining upload time")
+                try expect(values.allSatisfy { $0.estimatedSecondsRemaining == nil }, "An instant upload fabricated an ETA")
+            },
+            Case(name: "initial uploads report measured byte throughput") { f in
+                try f.write(f.local, "file.txt", String(repeating: "x", count: 1024 * 1024))
+                let rates = MergeEvents()
+                _ = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection, onTransferRate: { rate in
+                    rates.add(.init(kind: .progress, message: "", path: "file.txt", bytesPerSecond: rate, transferDirection: .upload))
+                })
+                try expect(rates.snapshot().contains { ($0.bytesPerSecond ?? 0) > 0 && $0.bytesPerSecond?.isFinite == true },
+                           "Initial upload only reported file counts, not bytes per second")
+                try expect(f.exists(f.remote, "file.txt"), "Rate reporting interfered with publication")
+            },
+            Case(name: "hidden local folders are browsable during adoption and pending retry") { f in
+                try f.write(f.local, ".hy2test/client.log", "local")
+                try f.fm.createDirectory(at: f.local.appendingPathComponent("Empty"), withIntermediateDirectories: true)
+                try await f.engine.connect(connection: f.connection, pinned: [], deferInitialMerge: true)
+                let normal = try await f.engine.listDirectory(relativePath: "")
+                try expect(!normal.entries.contains { $0.name == ".hy2test" }, "Hidden files ignored the visibility preference")
+                let hidden = try await f.engine.listDirectory(relativePath: "", includeHidden: true)
+                try expect(hidden.entries.contains { $0.name == ".hy2test" && $0.isDirectory && $0.syncStatus == .pending }, "Hidden local directory was not shown")
+                let nested = try await f.engine.listDirectory(relativePath: ".hy2test", includeHidden: true)
+                try expect(nested.entries.map(\.name) == ["client.log"], "Local-only folder could not be opened")
+                let empty = try await f.engine.listDirectory(relativePath: "Empty")
+                try expect(empty.entries.isEmpty, "Local-only empty directory was not browsable")
+                try await f.engine.abortInitialMerge(connectionID: f.connection.id)
+                let retry = try await f.engine.listDirectory(relativePath: "", includeHidden: true, includeUnpinnedLocal: true)
+                try expect(retry.entries.contains { $0.name == ".hy2test" }, "Failed adoption hid the files waiting for retry")
+            },
+            Case(name: "initial upload errors report exact source and destination without losing local data") { f in
+                try f.write(f.local, ".hy2test/client.log", "keep locally")
+                let directory = f.remote.appendingPathComponent(".hy2test")
+                try f.fm.createDirectory(at: directory, withIntermediateDirectories: true)
+                try f.fm.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directory.path)
+                defer { try? f.fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path) }
+                var failure: Error?
+                do { _ = try await f.merge() } catch { failure = error }
+                try expect(failure != nil, "A denied upload was reported as successful")
+                let message = failure!.localizedDescription
+                try expect(message.contains("Source:") && message.contains("Destination:") && message.contains(".hy2test/client.log"),
+                           "The failing copy direction and path were lost")
+                try expect(try f.read(f.local, ".hy2test/client.log") == "keep locally", "Failed upload damaged the local log")
+            },
             Case(name: "deferred connection is browsable before any local upload completes") { f in
                 try f.write(f.local, "local.txt", "waiting to upload")
                 try f.write(f.remote, "online.txt", "available now")
                 try await f.engine.connect(connection: f.connection, pinned: [], deferInitialMerge: true)
                 let listing = try await f.engine.listDirectory(relativePath: "")
                 try expect(listing.entries.contains { $0.name == "online.txt" }, "Connected server cannot be browsed")
+                try expect(listing.entries.contains { $0.name == "local.txt" && $0.isLocallyAvailable && $0.syncStatus == .pending },
+                           "Local files were hidden until the last upload completed")
                 try expect(!f.exists(f.remote, "local.txt"), "Connection waited for a file upload")
                 await f.engine.fullSync()
                 try expect(!f.exists(f.local, "online.txt"), "Normal sync ran before adoption finished")
@@ -188,7 +387,7 @@ struct InitialMergeTests {
                 try f.write(f.remote, "same.txt", "original")
                 try f.write(f.remote, "same (Local).txt", "existing server")
                 let paths = try await f.merge()
-                try expect(paths.contains("same (Local 3).txt"), "Conflict name collided with an existing file")
+                try expect(paths.contains("same (Local 3).txt"), "Conflict name collided with an existing file: \(paths)")
                 try await f.connectAndSync(paths)
                 try expect(try f.read(f.remote, "same (Local).txt") == "existing server", "Existing conflict copy overwritten")
                 try expect(try f.read(f.remote, "same (Local 2).txt") == "existing local", "Existing local file was lost")
@@ -238,12 +437,14 @@ struct InitialMergeTests {
             Case(name: "user dotfiles upload, internal sync state does not") { f in
                 try f.write(f.local, ".settings", "user settings")
                 try f.write(f.local, ".tethwork-sync-state.json", "old internal state")
+                try f.write(f.local, ".tethwork-verification-cache.json", "local verification cache")
                 try f.write(f.local, ".DS_Store", "finder metadata")
                 let paths = try await f.merge()
                 try expect(paths == [".settings"], "User or internal dotfile classification is wrong")
                 try expect(try f.read(f.remote, ".settings") == "user settings", "User dotfile omitted")
                 try expect(!f.exists(f.remote, ".tethwork-sync-state.json") && !f.exists(f.remote, ".DS_Store"),
                            "Internal metadata uploaded")
+                try expect(!f.exists(f.remote, ".tethwork-verification-cache.json"), "Verification cache uploaded")
             },
             Case(name: "a destination appearing during upload is never overwritten") { f in
                 try f.write(f.local, "same.txt", "local")
@@ -279,20 +480,27 @@ struct InitialMergeTests {
                 try expect(try f.read(f.local, "same.txt") == "local", "Cancellation changed local file")
                 try expect(!f.exists(f.remote, "same (Local).txt"), "Cancellation finalized an upload")
             },
-            Case(name: "a formerly identical file changing during merge fails without overwriting") { f in
+            Case(name: "a file edited during the pass is deferred instead of restarting adoption") { f in
                 try f.write(f.local, "same.txt", "identical")
                 try f.write(f.remote, "same.txt", "identical")
                 let changed = f.local.appendingPathComponent("same.txt")
-                do {
-                    _ = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection) { done, _, _ in
-                        if done == 0 { try? Data("new local edit".utf8).write(to: changed) }
+                let snapshots = MergeEvents()
+                let paths = try await SyncEngine.mergeExistingLocalFiles(connection: f.connection, onTransferRate: nil, onSnapshot: { snapshot in
+                    snapshots.add(.init(kind: .progress, message: "", path: snapshot.currentPath, initialUploadProgress: snapshot))
+                    if snapshot.phase == .transferring, snapshot.bytesDone == 0, snapshot.currentPath.isEmpty {
+                        try? Data("new local edit".utf8).write(to: changed)
                     }
-                    throw MergeFailure(description: "A changed file was adopted as identical")
-                } catch SyncError.invalidMove {
-                    // Retry must re-plan this as a conflict instead of overwriting the server.
-                }
+                })
+                try expect(paths.isEmpty, "A file that changed mid-pass was still pinned as adopted")
                 try expect(try f.read(f.remote, "same.txt") == "identical", "Server copy was overwritten")
                 try expect(try f.read(f.local, "same.txt") == "new local edit", "Local edit was lost")
+                try expect(snapshots.snapshot().compactMap(\.initialUploadProgress).contains { $0.deferredFiles == 1 },
+                           "Deferred changing files were not reported")
+                // A retry preserves both versions instead of looping forever.
+                let second = try await f.merge()
+                try expect(second == ["same (Local).txt"], "Retry did not adopt the edited file: \(second)")
+                try expect(try f.read(f.remote, "same.txt") == "identical", "Retry overwrote the server original")
+                try expect(try f.read(f.remote, "same (Local).txt") == "new local edit", "Retry did not keep the local edit")
             },
             Case(name: "symbolic links cannot upload data from outside the chosen folder") { f in
                 let outside = f.root.appendingPathComponent("outside.txt")

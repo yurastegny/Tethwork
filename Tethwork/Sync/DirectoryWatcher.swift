@@ -1,11 +1,22 @@
 import Foundation
+import CoreServices
+
+enum DirectoryWatcherMode {
+    /// Poll shallow directory snapshots. Used for SMB shares, where kernel
+    /// file events are unreliable and a recursive event stream is unavailable.
+    case polling
+    /// One recursive FSEvents stream for the whole local root. Never opens a
+    /// descriptor per watched directory.
+    case recursiveFileEvents
+}
 
 /// Lightweight directory observer. Avoids recursive scans of large network volumes.
 /// Watches one or more directories via kernel events (when available) plus shallow polling —
 /// needed for SMB/AFP where remote FS notifications are unreliable.
 final class DirectoryWatcher: @unchecked Sendable {
-    private var sources: [DispatchSourceFileSystemObject] = []
     private var pollTimer: DispatchSourceTimer?
+    private var eventStream: FSEventStreamRef?
+    private let mode: DirectoryWatcherMode
     private let queue = DispatchQueue(label: "app.tethwork.watcher", qos: .utility)
     private let onChange: @Sendable (URL) -> Void
     private var watchedURLs: [URL] = []
@@ -17,7 +28,9 @@ final class DirectoryWatcher: @unchecked Sendable {
     private var isRunning = false
     private var generation: UInt64 = 0
 
-    init(onChange: @escaping @Sendable (URL) -> Void) {
+    init(mode: DirectoryWatcherMode = .polling,
+         onChange: @escaping @Sendable (URL) -> Void) {
+        self.mode = mode
         self.onChange = onChange
     }
 
@@ -35,7 +48,18 @@ final class DirectoryWatcher: @unchecked Sendable {
             self.stopOnQueue()
             self.isRunning = true
             self.pollInterval = max(0.4, interval)
-            self.applyWatchedURLs(urls, restartPoll: true, restartDescriptors: true)
+            switch self.mode {
+            case .polling:
+                self.applyWatchedURLs(urls, restartPoll: true)
+            case .recursiveFileEvents:
+                self.watchedURLs = Self.dedupe(urls)
+                if !self.startFileEvents() {
+                    // FSEvents is unavailable (for example on a filesystem that
+                    // does not support it). Keep a root-level poll as a fallback
+                    // rather than falling back to one descriptor per directory.
+                    self.startShallowPoll()
+                }
+            }
         }
     }
 
@@ -44,7 +68,17 @@ final class DirectoryWatcher: @unchecked Sendable {
         queue.async {
             defer { completion?() }
             guard self.isRunning else { return }
-            self.applyWatchedURLs(urls, restartPoll: false, restartDescriptors: true)
+            switch self.mode {
+            case .polling:
+                self.applyWatchedURLs(urls, restartPoll: false)
+            case .recursiveFileEvents:
+                let roots = Self.dedupe(urls)
+                guard roots.map(\.path) != self.watchedURLs.map(\.path) else { return }
+                self.generation &+= 1
+                self.stopFileEventsOnQueue()
+                self.watchedURLs = roots
+                if !self.startFileEvents() { self.startShallowPoll() }
+            }
         }
     }
 
@@ -60,10 +94,7 @@ final class DirectoryWatcher: @unchecked Sendable {
         generation &+= 1
         pendingNotify?.cancel()
         pendingNotify = nil
-        for source in sources {
-            source.cancel()
-        }
-        sources = []
+        stopFileEventsOnQueue()
         pollTimer?.cancel()
         pollTimer = nil
         lastSignatures = [:]
@@ -72,7 +103,7 @@ final class DirectoryWatcher: @unchecked Sendable {
 
     // MARK: - Internals
 
-    private func applyWatchedURLs(_ urls: [URL], restartPoll: Bool, restartDescriptors: Bool) {
+    private func applyWatchedURLs(_ urls: [URL], restartPoll: Bool) {
         let unique = Self.dedupe(urls)
         watchedURLs = unique
 
@@ -85,54 +116,112 @@ final class DirectoryWatcher: @unchecked Sendable {
             lastSignatures[url.path] = shallowSignature(of: url)
         }
 
-        if restartDescriptors {
-            restartDescriptorWatches()
-        }
-
         if restartPoll || pollTimer == nil {
             startShallowPoll()
         }
     }
 
-    private func restartDescriptorWatches() {
-        generation &+= 1
-        let currentGeneration = generation
-        for source in sources {
-            source.cancel()
-        }
-        sources = []
-
-        for url in watchedURLs {
-            let fd = open(url.path, O_EVTONLY)
-            guard fd >= 0 else { continue }
-
-            let source = DispatchSource.makeFileSystemObjectSource(
-                fileDescriptor: fd,
-                // Reading a file can change access attributes on a NAS. Those
-                // events must not make content verification trigger itself.
-                // Actual mtime/size changes are also covered by the shallow poll.
-                eventMask: [.write, .delete, .rename, .extend, .link],
-                queue: queue
-            )
-            source.setEventHandler { [weak self] in
-                guard let self, self.isRunning, self.generation == currentGeneration else { return }
-                self.notifyChange(url)
+    private func startFileEvents() -> Bool {
+        guard !watchedURLs.isEmpty else { return false }
+        var context = FSEventStreamContext(
+            version: 0,
+            info: Unmanaged.passUnretained(self).toOpaque(),
+            retain: nil,
+            release: nil,
+            copyDescription: nil
+        )
+        let flags = UInt32(
+            kFSEventStreamCreateFlagFileEvents |
+            kFSEventStreamCreateFlagNoDefer |
+            kFSEventStreamCreateFlagWatchRoot
+        )
+        let callback: FSEventStreamCallback = { _, info, count, paths, flags, _ in
+            guard let info else { return }
+            let watcher = Unmanaged<DirectoryWatcher>.fromOpaque(info).takeUnretainedValue()
+            let eventPaths = paths.assumingMemoryBound(to: UnsafePointer<CChar>.self)
+            for index in 0..<count {
+                let path = String(cString: eventPaths[index])
+                if DirectoryWatcher.isRelevantFileEvent(path: path, flags: flags[index]) {
+                    watcher.fileEventsDidFire()
+                    break
+                }
             }
-            // Dispatch may still be handling the old source after cancel(). Do not
-            // close (and potentially reuse) its descriptor until cancellation finishes.
-            source.setCancelHandler { close(fd) }
-            source.resume()
-            sources.append(source)
         }
+        let paths = watchedURLs.map(\.path) as CFArray
+        guard let stream = FSEventStreamCreate(
+            kCFAllocatorDefault,
+            callback,
+            &context,
+            paths,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            0.25,
+            flags
+        ) else {
+            NSLog("Tethwork could not create a recursive file watcher for %@", watchedURLs.map(\.path).joined(separator: ", "))
+            return false
+        }
+        FSEventStreamSetDispatchQueue(stream, queue)
+        guard FSEventStreamStart(stream) else {
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+            NSLog("Tethwork could not start a recursive file watcher for %@", watchedURLs.map(\.path).joined(separator: ", "))
+            return false
+        }
+        eventStream = stream
+        return true
+    }
+
+    private func stopFileEventsOnQueue() {
+        guard let stream = eventStream else { return }
+        eventStream = nil
+        FSEventStreamStop(stream)
+        FSEventStreamInvalidate(stream)
+        FSEventStreamRelease(stream)
+    }
+
+    private func fileEventsDidFire() {
+        guard isRunning, let root = watchedURLs.first else { return }
+        notifyChange(root)
+    }
+
+    /// State/cache checkpoints are writes too. Feeding them back into the
+    /// engine makes each completed reconciliation schedule another full pass.
+    static func isRelevantFileEvent(path: String, flags: FSEventStreamEventFlags) -> Bool {
+        let recovery = UInt32(kFSEventStreamEventFlagMustScanSubDirs |
+                              kFSEventStreamEventFlagUserDropped |
+                              kFSEventStreamEventFlagKernelDropped |
+                              kFSEventStreamEventFlagRootChanged)
+        if flags & recovery != 0 { return true }
+        let components = URL(fileURLWithPath: path).pathComponents
+        if components.contains(where: {
+            $0 == ".tethwork-sync-state.json" || $0.hasPrefix(".tethwork-sync-state.json.sb-") ||
+            $0 == ".tethwork-verification-cache.json" || $0.hasPrefix(".tethwork-verification-cache.json.sb-") ||
+            $0 == ".tethwork-trash" || $0.hasPrefix(".tethwork-copy-") || $0 == ".DS_Store"
+        }) { return false }
+        // A directory's mtime changes when a checkpoint is replaced. File-level
+        // events already describe actual user additions/removals/edits below it.
+        let structural = UInt32(kFSEventStreamEventFlagItemCreated |
+                                kFSEventStreamEventFlagItemRemoved |
+                                kFSEventStreamEventFlagItemRenamed |
+                                kFSEventStreamEventFlagItemInodeMetaMod |
+                                kFSEventStreamEventFlagItemChangeOwner |
+                                kFSEventStreamEventFlagItemXattrMod)
+        if flags & UInt32(kFSEventStreamEventFlagItemIsDir) != 0,
+           flags & structural == 0 { return false }
+        return true
     }
 
     private func startShallowPoll() {
         pollTimer?.cancel()
 
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + pollInterval, repeating: pollInterval)
+        timer.schedule(deadline: .now() + pollInterval)
         timer.setEventHandler { [weak self] in
-            self?.pollOnce()
+            guard let self, self.isRunning else { return }
+            self.pollOnce()
+            // A slow NAS sweep must have an idle gap, not an overdue repeating
+            // timer immediately starting the next sweep and saturating the share.
+            if self.isRunning { self.pollTimer?.schedule(deadline: .now() + self.pollInterval) }
         }
         timer.resume()
         pollTimer = timer
@@ -166,7 +255,9 @@ final class DirectoryWatcher: @unchecked Sendable {
             // Snapshot once per coalesced burst, not once per copied/deleted file.
             // The next poll must not report this same kernel event a second time.
             // Kernel events themselves remain valid for deeper directory changes.
-            self.lastSignatures[url.path] = self.shallowSignature(of: url)
+            if self.mode == .polling {
+                self.lastSignatures[url.path] = self.shallowSignature(of: url)
+            }
             self.onChange(url)
         }
         pendingNotify = work
@@ -193,13 +284,20 @@ final class DirectoryWatcher: @unchecked Sendable {
             parts.append("missing")
         }
 
-        let names = (try? fm.contentsOfDirectory(atPath: root.path)) ?? []
-        for name in names.sorted() where !name.hasPrefix(".") {
-            let path = (root.path as NSString).appendingPathComponent(name)
-            if let attrs = try? fm.attributesOfItem(atPath: path) {
-                let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
-                let mtime = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
-                let identifier = (attrs[.systemFileNumber] as? NSNumber)?.stringValue ?? ""
+        let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey, .fileResourceIdentifierKey]
+        let children = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: Array(keys),
+                                                    options: [.skipsHiddenFiles])) ?? []
+        for child in children.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            let name = child.lastPathComponent
+            if let values = try? child.resourceValues(forKeys: keys) {
+                let size = Int64(values.fileSize ?? 0)
+                let mtime = values.contentModificationDate?.timeIntervalSince1970 ?? 0
+                // Resource identifiers are opaque. Data/NSNumber representations
+                // are stable; never use an object's memory-address description.
+                let identifier: String
+                if let data = values.fileResourceIdentifier as? Data { identifier = data.base64EncodedString() }
+                else if let number = values.fileResourceIdentifier as? NSNumber { identifier = number.stringValue }
+                else { identifier = "" }
                 parts.append("\(name):\(identifier):\(size):\(mtime)")
             } else {
                 parts.append(name)

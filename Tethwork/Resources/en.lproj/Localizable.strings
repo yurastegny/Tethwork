@@ -1,0 +1,17 @@
+/* English is the development language; untranslated keys fall back to the key. */
+"Ready" = "Ready";
+"Replaced the older %@ copy of “%@” with the newer %@ version." = "Replaced the older %@ copy of “%@” with the newer %@ version.";
+"Deleted on another Mac: %@" = "Deleted on another Mac: %@";
+"Counting files…" = "Counting files…";
+"Final checks…" = "Final checks…";
+"Uploaded %@ of %@" = "Uploaded %@ of %@";
+"%lld of %lld files" = "%lld of %lld files";
+"Estimating time remaining…" = "Estimating time remaining…";
+"Less than a minute remaining" = "Less than a minute remaining";
+"About %@ remaining" = "About %@ remaining";
+"Checked %@ of %@" = "Checked %@ of %@";
+"This stage: %@" = "This stage: %@";
+"%lld of %lld items" = "%lld of %lld items";
+"Pause Sync" = "Pause Sync";
+"Completed: %lld%%" = "Completed: %lld%%";
+"Deferred changing files: %lld" = "Deferred changing files: %lld";

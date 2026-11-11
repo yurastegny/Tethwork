@@ -19,6 +19,9 @@ final class BrowserKeyMonitor: ObservableObject {
     func start(actions: Actions) {
         stop()
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard let window = event.window, window === NSApp.keyWindow,
+                  window.identifier?.rawValue == "main", !(window is NSPanel),
+                  NSApp.modalWindow == nil, window.attachedSheet == nil else { return event }
             // Ignore when a modal sheet / alert / text field is editing.
             if let first = NSApp.keyWindow?.firstResponder,
                first is NSTextView || first is NSTextField {
@@ -82,7 +85,9 @@ enum AppWindowFocus {
     /// After a modal alert, the first click is often eaten by window activation.
     static func reclaim() {
         NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible }) {
+        if let window = NSApp.windows.first(where: {
+            $0.identifier?.rawValue == "main" && $0.attachedSheet == nil && !($0 is NSPanel)
+        }) {
             window.makeKeyAndOrderFront(nil)
         }
     }

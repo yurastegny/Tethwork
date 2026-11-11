@@ -90,10 +90,16 @@ private struct ConnectionsSettingsTab: View {
 }
 
 private struct AboutSettingsTab: View {
+    private var displayVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let channel = Bundle.main.object(forInfoDictionaryKey: "TethworkReleaseChannel") as? String ?? ""
+        return [version, channel].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
     var body: some View {
         Form {
             Section("About") {
-                LabeledContent("Version", value: "1.0")
+                LabeledContent("Version", value: displayVersion)
                 Text("Tethwork is a Finder-like browser for network volumes with selective two-way sync.")
                     .foregroundStyle(.secondary)
                     .font(.callout)

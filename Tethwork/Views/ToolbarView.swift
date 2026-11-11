@@ -14,7 +14,13 @@ struct MainBrowserView: View {
             pathBar
             FileBrowserView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            StatusBarView()
+            if showsTransferDetails, let progress = model.syncProgress {
+                Divider()
+                TransferDetails(progress: progress)
+                    .environmentObject(model)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+            StatusBarView(showsCompactSyncProgress: !showsTransferDetails)
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
@@ -62,29 +68,16 @@ struct MainBrowserView: View {
                 .help(model.syncProgress == nil
                       ? "Sync local copies in the background"
                       : "Background synchronization · Click for details")
-                .popover(isPresented: $showsTransferDetails) {
-                    if let progress = model.syncProgress {
-                        TransferDetails(progress: progress)
-                            .environmentObject(model)
-                    }
-                }
 
-                Picker("View", selection: $model.viewMode) {
-                    Image(systemName: "list.bullet").tag(AppModel.ViewMode.list)
-                    Image(systemName: "square.grid.2x2").tag(AppModel.ViewMode.icons)
-                    Image(systemName: "rectangle.split.3x1").tag(AppModel.ViewMode.columns)
+                Picker("View", selection: Binding(get: { model.viewMode }, set: { model.setViewMode($0) })) {
+                    Label("List", systemImage: "list.bullet").tag(AppModel.ViewMode.list)
+                    Label("Icons", systemImage: "square.grid.2x2").tag(AppModel.ViewMode.icons)
+                    Label("Columns", systemImage: "rectangle.split.3x1").tag(AppModel.ViewMode.columns)
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 120)
                 .labelsHidden()
                 .help("View: list, icons, or columns")
-                .onChange(of: model.viewMode) { previous, mode in
-                    if mode == .columns, previous != .columns {
-                        Task { await model.ensureColumns(to: model.currentPath) }
-                    } else if mode != .columns, previous == .columns {
-                        Task { try? await model.loadDirectory(model.currentPath) }
-                    }
-                }
 
                 if isSearchExpanded || !model.searchQuery.isEmpty {
                     HStack(spacing: 6) {
@@ -130,6 +123,9 @@ struct MainBrowserView: View {
         }
         .onChange(of: model.syncProgress == nil) { _, isFinished in
             if isFinished { showsTransferDetails = false }
+        }
+        .onChange(of: model.syncProgress?.initialUpload != nil, initial: true) { _, isInitialUpload in
+            if isInitialUpload { showsTransferDetails = true }
         }
         .onKeyPress(.space) {
             model.previewSelected()
@@ -221,12 +217,40 @@ private struct TransferDetails: View {
                         .fontWeight(.semibold)
                     Spacer(minLength: 12)
                     if !progress.isIndeterminate {
-                        Text("\(progress.done) of \(progress.total) files · \(progress.percent)%")
-                            .monospacedDigit()
+                        if progress.initialUpload != nil {
+                            Text("\(progress.percent)%")
+                                .monospacedDigit()
+                        } else {
+                            Text("\(progress.done) of \(progress.total) files · \(progress.percent)%")
+                                .monospacedDigit()
+                        }
                     } else if progress.phase == .transferring {
                         Text("\(progress.done) files transferred")
                             .monospacedDigit()
                     }
+                }
+                if let summary = progress.byteSummary {
+                    HStack {
+                        Text(summary)
+                        Spacer(minLength: 12)
+                        if progress.phase == .checking || progress.phase == .finishing {
+                            Text("\(progress.done) of \(progress.total) items")
+                        } else {
+                            Text("\(progress.done) of \(progress.total) files")
+                        }
+                    }
+                    .font(.caption)
+                    .monospacedDigit()
+                }
+                if let remaining = progress.remainingTimeText {
+                    Text(remaining)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let deferred = progress.initialUpload?.deferredFiles, deferred > 0 {
+                    Text(String(format: String(localized: "Deferred changing files: %lld"), Int64(deferred)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Text(detail)
                     .font(.caption)
@@ -240,17 +264,21 @@ private struct TransferDetails: View {
             }
         }
         .font(.callout)
-        .padding(16)
-        .frame(width: 380)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
     }
 
     private var title: String {
         switch progress.phase {
         case .preparing:
+            if progress.initialUpload != nil { return String(localized: "Counting files…") }
             return progress.direction == .download ? "Preparing download…" : "Preparing files…"
         case .checking:
             return "Checking local copies…"
         case .finishing:
+            if progress.initialUpload != nil { return String(localized: "Final checks…") }
             return "Finishing download…"
         case .transferring:
             switch progress.direction {
@@ -269,8 +297,46 @@ private struct TransferDetails: View {
 
 struct StatusBarView: View {
     @EnvironmentObject private var model: AppModel
+    var showsCompactSyncProgress = true
+    @State private var showsErrorDetails = false
+
+    private static func phaseLabel(_ phase: SyncPhase) -> String {
+        switch phase {
+        case .preparing: return String(localized: "Preparing files…")
+        case .checking: return String(localized: "Checking files…")
+        case .finishing: return String(localized: "Finishing synchronization…")
+        case .transferring: return String(localized: "Synchronizing files…")
+        }
+    }
+
+    static func activityStatusText(progress: AppModel.SyncProgress?, fallback: String) -> String {
+        guard let progress else { return fallback }
+        if progress.initialUpload != nil {
+            switch progress.phase {
+            case .preparing: return String(localized: "Counting files…")
+            case .checking: return String(localized: "Checking local copies…")
+            case .finishing: return String(localized: "Final checks…")
+            case .transferring: return String(localized: "Uploading files…")
+            }
+        }
+        return phaseLabel(progress.phase)
+    }
 
     var body: some View {
+        VStack(spacing: 0) {
+            if showsErrorDetails, let error = model.errorMessage {
+                ErrorDetailsPanel(title: "Synchronization error", message: error) {
+                    showsErrorDetails = false
+                }
+            }
+            statusBar
+        }
+        .onChange(of: model.errorMessage) { _, error in
+            if error == nil { showsErrorDetails = false }
+        }
+    }
+
+    private var statusBar: some View {
         HStack(spacing: 12) {
             if let error = model.errorMessage {
                 Text(error)
@@ -278,21 +344,26 @@ struct StatusBarView: View {
                     .lineLimit(1)
                     .help(error)
                     .textSelection(.enabled)
-            } else {
-                Text(model.statusMessage)
+                Button("Details…") { showsErrorDetails.toggle() }
+                    .buttonStyle(.borderless)
+                    .help("Show or hide the full error")
+                    .accessibilityLabel(Text("Show error details"))
+            } else if showsCompactSyncProgress || model.syncProgress == nil {
+                Text(Self.activityStatusText(progress: model.syncProgress, fallback: model.statusMessage))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
 
             Spacer(minLength: 8)
 
-            if let sync = model.syncProgress {
+            if let sync = model.syncProgress, showsCompactSyncProgress {
                 if sync.isIndeterminate {
                     ProgressView()
                         .controlSize(.small)
-                    Text(sync.phase == .transferring ? "\(sync.done) files transferred" : "Working…")
+                    Text(sync.phase == .transferring ? "\(sync.done) files transferred" : Self.phaseLabel(sync.phase))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
+                        .lineLimit(1)
                 } else {
                     ProgressView(value: sync.fraction)
                         .controlSize(.small)

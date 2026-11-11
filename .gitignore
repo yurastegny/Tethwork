@@ -4,3 +4,11 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 .swiftpm/
+*.xcarchive
+*.dSYM/
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.mobileprovision

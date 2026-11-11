@@ -28,11 +28,26 @@ struct SidebarView: View {
                 }
 
                 ForEach(model.connections) { conn in
-                    SidebarItemLabel(
-                        title: conn.name,
-                        systemImage: "externaldrive",
-                        isSelected: selection == SidebarID.disk(conn.id)
-                    )
+                    HStack {
+                        SidebarItemLabel(
+                            title: conn.name,
+                            systemImage: "externaldrive",
+                            isSelected: selection == SidebarID.disk(conn.id)
+                        )
+                        Spacer(minLength: 6)
+                        if let state = model.connectionSyncStates[conn.id] {
+                            if state.isSyncing {
+                                ProgressView()
+                                    .controlSize(.mini)
+                                    .fixedSize()
+                                    .help("Syncing…")
+                            } else if let error = state.error {
+                                Image(systemName: "exclamationmark.circle")
+                                    .foregroundStyle(.orange)
+                                    .help(error)
+                            }
+                        }
+                    }
                         .modifier(SidebarRowStyle(isSelected: selection == SidebarID.disk(conn.id)))
                         .tag(SidebarID.disk(conn.id))
                         .contextMenu {
@@ -181,7 +196,7 @@ struct SidebarView: View {
                 model.closeTrash()
                 if let diskID = SidebarID.diskID(from: newValue),
                    let conn = model.connections.first(where: { $0.id == diskID }) {
-                    if model.activeConnection?.id == diskID {
+                    if model.activeConnection?.id == diskID, model.connectingConnectionID == nil {
                         await model.navigateTo("", displayName: conn.name)
                     } else {
                         await model.selectConnection(conn)
@@ -205,6 +220,7 @@ struct SidebarView: View {
             }
             guard pendingNavigation == navigation else { return }
             pendingNavigation = nil
+            setSelectionFromModel()
         }
     }
 

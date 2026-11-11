@@ -105,10 +105,7 @@ private struct ColumnPaneView: View {
                                     },
                                     onEmptyClick: {
                                         model.clearSelection()
-                                        if model.columns.indices.contains(columnIndex) {
-                                            model.columns[columnIndex].revealedChildID = nil
-                                            model.columns = Array(model.columns.prefix(columnIndex + 1))
-                                        }
+                                        model.collapseColumns(to: columnIndex)
                                     }
                                 ) {
                                     LazyVStack(spacing: 1) {
@@ -172,9 +169,8 @@ private struct ColumnPaneView: View {
                                 }
                             }
                         }
-                        .opacity(column.isLoading ? 0.45 : 1)
 
-                        if column.isLoading {
+                        if column.isLoading && column.entries.isEmpty {
                             VStack(spacing: 6) {
                                 ProgressView()
                                     .controlSize(.small)
@@ -271,7 +267,8 @@ private struct ColumnRowView: View {
                 url: model.previewURL(for: entry),
                 isDirectory: entry.isDirectory,
                 size: 18,
-                isSelected: isSelected
+                isSelected: isSelected,
+                modified: entry.modified
             )
             .frame(width: 18, height: 18)
             if model.renamingID == entry.id {
@@ -295,11 +292,14 @@ private struct ColumnRowView: View {
                 if status.isSyncing {
                     Image(systemName: status.systemImage)
                         .font(.caption2)
-                        .foregroundStyle(isSelected ? Color.white : (isKeyWindow ? Color.accentColor : Color.secondary))
-                } else if entry.syncMode == .offline {
-                    Image(systemName: "checkmark.circle")
+                        .foregroundStyle(status.foregroundColor(isSelected: isSelected, isKeyWindow: isKeyWindow))
+                        .help(LocalizedStringKey(status.title))
+                } else if entry.syncMode == .offline || entry.hasPinnedDescendants ||
+                            (entry.folderStorageState != nil && entry.folderStorageState != .onlineOnly) {
+                    Image(systemName: status.systemImage)
                         .font(.caption2)
-                        .foregroundStyle(isSelected ? Color.white : (isKeyWindow ? Color.accentColor : Color.secondary))
+                        .foregroundStyle(status.foregroundColor(isSelected: isSelected, isKeyWindow: isKeyWindow))
+                        .help(LocalizedStringKey(status.title))
                 }
             }
             if entry.isDirectory, model.renamingID != entry.id {
@@ -312,6 +312,11 @@ private struct ColumnRowView: View {
         .padding(.vertical, 4)
         .background(rowBackground)
         .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        .accessibilityElement(children: model.renamingID == entry.id ? .contain : .combine)
+        .accessibilityLabel(Text(entry.name))
+        .accessibilityValue(Text(isSelected ? "Selected" : "Not selected"))
+        .accessibilityAction(named: Text("Open")) { Task { await model.openEntry(entry) } }
+        .accessibilityAction(named: Text("Select")) { model.selectOnly(entry.id) }
     }
 
     private var rowBackground: Color {

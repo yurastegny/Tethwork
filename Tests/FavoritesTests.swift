@@ -1,9 +1,14 @@
 import Foundation
 
+private struct TestFailure: Error { let message: String }
+private func expect(_ condition: Bool, _ message: String) throws {
+    if !condition { throw TestFailure(message: message) }
+}
+
 /// Standalone persistence regression test using an isolated preferences suite.
 @main
 struct FavoritesTests {
-    static func main() {
+    static func main() throws {
         let suite = "app.tethwork.favorites-test.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -13,30 +18,30 @@ struct FavoritesTests {
         store.upsert(first)
         store.upsert(second)
         store.setPinnedPaths(["Local"], for: first.id)
-        precondition(store.favoriteFolders.isEmpty, "Local storage must not automatically create favorites")
+        try expect(store.favoriteFolders.isEmpty, "Local storage must not automatically create favorites")
 
         let a = FavoriteFolder(connectionID: first.id, relativePath: "Online")
         let b = FavoriteFolder(connectionID: second.id, relativePath: "Online")
         store.favoriteFolders = [a, b]
-        precondition(store.pinnedPaths(for: first.id) == ["Local"], "Favorites must not change sync pins")
+        try expect(store.pinnedPaths(for: first.id) == ["Local"], "Favorites must not change sync pins")
         let reloaded = ConfigStore(defaults: defaults)
-        precondition(reloaded.favoriteFolders == [a, b], "Persist order and stable IDs across reloads")
+        try expect(reloaded.favoriteFolders == [a, b], "Persist order and stable IDs across reloads")
         store.pendingInitialMergeIDs = [first.id, second.id]
-        precondition(reloaded.pendingInitialMergeIDs == [first.id, second.id],
+        try expect(reloaded.pendingInitialMergeIDs == [first.id, second.id],
                      "Background uploads must remain resumable after reopening the app")
 
         store.setPinnedPaths([], for: first.id)
-        precondition(store.favoriteFolders == [a, b], "Unpinning must preserve favorites")
+        try expect(store.favoriteFolders == [a, b], "Unpinning must preserve favorites")
         store.setPinnedPaths(["Local"], for: first.id)
         store.favoriteFolders = [b]
-        precondition(store.pinnedPaths(for: first.id) == ["Local"], "Removing a favorite must not evict local files")
+        try expect(store.pinnedPaths(for: first.id) == ["Local"], "Removing a favorite must not evict local files")
 
         store.favoriteFolders = [a, b]
         store.upsert(first)
-        precondition(store.connections.map(\.id) == [first.id, second.id], "Selection must not reorder servers")
+        try expect(store.connections.map(\.id) == [first.id, second.id], "Selection must not reorder servers")
         store.deleteConnection(id: first.id)
-        precondition(store.favoriteFolders == [b], "Removing a server must keep other servers' favorites")
-        precondition(store.pendingInitialMergeIDs == [second.id], "Removing a server must clear only its pending upload")
+        try expect(store.favoriteFolders == [b], "Removing a server must keep other servers' favorites")
+        try expect(store.pendingInitialMergeIDs == [second.id], "Removing a server must clear only its pending upload")
         print("PASS: favorites persist independently of pins, retain order and respect server identity")
     }
 }

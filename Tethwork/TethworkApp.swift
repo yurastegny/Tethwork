@@ -1,13 +1,37 @@
 import SwiftUI
 
+final class TethworkApplicationDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSLog("Tethwork launched (pid %d)", ProcessInfo.processInfo.processIdentifier)
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false // Closing the browser must never stop background synchronization.
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        NSLog("Tethwork terminating normally (pid %d)", ProcessInfo.processInfo.processIdentifier)
+    }
+}
+
 @main
 struct TethworkApp: App {
-    @StateObject private var appModel = AppModel()
+    @NSApplicationDelegateAdaptor(TethworkApplicationDelegate.self) private var applicationDelegate
+    @StateObject private var appModel: AppModel
+    @StateObject private var menuBarController: MenuBarStatusController
+
+    init() {
+        let model = AppModel()
+        _appModel = StateObject(wrappedValue: model)
+        _menuBarController = StateObject(wrappedValue: MenuBarStatusController(
+            model: model, installsStatusItem: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil))
+    }
 
     var body: some Scene {
-        WindowGroup(id: "main") {
+        Window("Tethwork", id: "main") {
             ContentView()
                 .environmentObject(appModel)
+                .background(MenuBarWindowActionBridge(controller: menuBarController))
                 // Min size lives on split columns (see ContentView) — minWidth on
                 // NavigationSplitView itself makes the sidebar *show* animation hitch.
                 .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
@@ -52,7 +76,7 @@ struct TethworkApp: App {
                 .keyboardShortcut("a", modifiers: [.control])
                 .disabled(!appModel.showingTrash && appModel.activeConnection == nil)
 
-                Button(appModel.showingTrash ? "Delete Immediately" : "Move to Trash") {
+                Button(LocalizedStringKey(appModel.showingTrash ? "Delete Immediately" : "Move to Trash")) {
                     if appModel.showingTrash {
                         appModel.requestDeleteTrashSelection()
                     } else {
@@ -93,7 +117,13 @@ struct TethworkApp: App {
                 .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled(appModel.activeConnection == nil)
 
-                Button(appModel.isCurrentPinned ? "Keep Current Folder Online Only" : "Keep Current Folder on This Mac") {
+                Button("Full Content Check") {
+                    Task { await appModel.fullSync(recheckContents: true) }
+                }
+                .help("Read all pinned files again, ignoring the verification cache")
+                .disabled(appModel.activeConnection == nil || appModel.syncProgress != nil || appModel.isMergingInitialFiles)
+
+                Button(LocalizedStringKey(appModel.isCurrentPinned ? "Keep Current Folder Online Only" : "Keep Current Folder on This Mac")) {
                     Task { await appModel.togglePinCurrent() }
                 }
                 .disabled(appModel.activeConnection == nil)
@@ -106,6 +136,10 @@ struct TethworkApp: App {
                 .disabled(appModel.activeConnection == nil)
             }
             CommandMenu("View") {
+                Toggle("Show Hidden Files", isOn: Binding(get: { appModel.showsHiddenFiles }, set: { appModel.setShowsHiddenFiles($0) }))
+                    .keyboardShortcut(".", modifiers: [.command, .shift])
+                    .disabled(appModel.connectingConnectionID != nil || appModel.isLoadingDirectory)
+                Divider()
                 Button("Quick Look") {
                     appModel.previewSelected()
                 }
@@ -114,11 +148,10 @@ struct TethworkApp: App {
             }
         }
 
-        MenuBarExtra {
-            MenuBarStatusView()
+        Settings {
+            SettingsView()
                 .environmentObject(appModel)
-        } label: {
-            Image(appModel.menuBarIconName)
         }
+
     }
 }

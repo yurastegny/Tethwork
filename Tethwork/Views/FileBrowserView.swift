@@ -79,7 +79,7 @@ enum TethworkDrag {
         if provider.canLoadObject(ofClass: URL.self) {
             let url: URL? = await withCheckedContinuation { continuation in
                 _ = provider.loadObject(ofClass: URL.self) { object, _ in
-                    continuation.resume(returning: object as? URL)
+                    continuation.resume(returning: object)
                 }
             }
             if let url, url.isFileURL { return url.standardizedFileURL }
@@ -93,7 +93,7 @@ struct FileBrowserView: View {
     @Environment(\.controlActiveState) private var controlActiveState
     @State private var dropTargetID: String?
     /// Icons currently realized by LazyVGrid — used to remember top-of-viewport.
-    @State private var visibleIconIDs: Set<String> = []
+    @State private var visibleIconPositions: [String: Int] = [:]
 
     /// Mac convention: tinted status indicators desaturate to a single gray when the window isn't key.
     private var isKeyWindow: Bool { controlActiveState == .key }
@@ -163,7 +163,7 @@ struct FileBrowserView: View {
             }
         }
         .overlay {
-            if model.isLoadingDirectory {
+            if model.isLoadingDirectory && entries.isEmpty {
                 ZStack {
                     Color.primary.opacity(0.06)
                     VStack(spacing: 10) {
@@ -204,14 +204,8 @@ struct FileBrowserView: View {
             TableColumn("Status") { row in
                 let selected = model.selectedIDs.contains(row.id)
                 let status = model.displaySyncStatus(for: row.entry)
-                Label(status.title, systemImage: status.systemImage)
-                    .foregroundStyle(
-                        selected
-                            ? Color.white
-                            : (isKeyWindow && (status.isSyncing || row.entry.syncMode == .offline)
-                               ? Color.accentColor
-                               : .secondary)
-                    )
+                Label(LocalizedStringKey(status.title), systemImage: status.systemImage)
+                    .foregroundStyle(status.foregroundColor(isSelected: selected, isKeyWindow: isKeyWindow))
             }
             .width(130)
 
@@ -241,8 +235,8 @@ struct FileBrowserView: View {
             }
         }
         .onChange(of: model.selectedIDs) { _, newValue in
-            if let id = newValue.first {
-                model.lastClickedID = id
+            if model.lastClickedID.map({ newValue.contains($0) }) != true {
+                model.lastClickedID = rows.first(where: { newValue.contains($0.id) })?.id
             }
             if model.viewMode == .list, model.renamingID == nil {
                 BrowserScrollSupport.focusBrowserTable()
@@ -311,8 +305,10 @@ struct FileBrowserView: View {
             FileThumbnailView(
                 url: model.previewURL(for: entry),
                 isDirectory: entry.isDirectory,
-                size: entry.isDirectory ? 24 : 28,
-                isSelected: model.selectedIDs.contains(entry.id)
+                // Keep the icon column and the start of every filename aligned.
+                size: 28,
+                isSelected: model.selectedIDs.contains(entry.id),
+                modified: entry.modified
             )
             if model.renamingID == entry.id {
                 InlineRenameField(
@@ -388,16 +384,16 @@ struct FileBrowserView: View {
                             columns: [GridItem(.adaptive(minimum: 120, maximum: 128), spacing: 8)],
                             spacing: 10
                         ) {
-                            ForEach(entries) { entry in
+                            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                                 iconCell(entry, entries: entries)
                                     .id(entry.id)
                                     .marqueeFrame(id: entry.id, in: "icons-marquee")
                                     .onAppear {
-                                        visibleIconIDs.insert(entry.id)
+                                        visibleIconPositions[entry.id] = index
                                         syncIconsScrollAnchor(entries: entries)
                                     }
                                     .onDisappear {
-                                        visibleIconIDs.remove(entry.id)
+                                        visibleIconPositions.removeValue(forKey: entry.id)
                                         syncIconsScrollAnchor(entries: entries)
                                     }
                             }
@@ -434,14 +430,14 @@ struct FileBrowserView: View {
                 model.iconsColumnsPerRow = value
             }
             .onChange(of: model.currentPath) { _, _ in
-                visibleIconIDs = []
+                visibleIconPositions = [:]
             }
         }
     }
 
     private func syncIconsScrollAnchor(entries: [FileEntry]) {
         guard model.viewMode == .icons else { return }
-        let topID = entries.first(where: { visibleIconIDs.contains($0.id) })?.id
+        let topID = visibleIconPositions.min(by: { $0.value < $1.value })?.key
         model.noteIconsScroll(topVisibleID: topID)
     }
 
@@ -495,7 +491,8 @@ struct FileBrowserView: View {
                 url: model.previewURL(for: entry),
                 isDirectory: entry.isDirectory,
                 size: 96,
-                isSelected: selected
+                isSelected: selected,
+                modified: entry.modified
             )
             if renaming {
                 InlineRenameField(
@@ -517,16 +514,10 @@ struct FileBrowserView: View {
                     .frame(maxWidth: .infinity)
                     .foregroundStyle(selected ? Color.white : Color.primary)
                 let status = model.displaySyncStatus(for: entry)
-                Label(status.title, systemImage: status.systemImage)
+                Label(LocalizedStringKey(status.title), systemImage: status.systemImage)
                     .font(.caption2)
                     .frame(maxWidth: .infinity)
-                    .foregroundStyle(
-                        selected
-                            ? Color.white
-                            : (isKeyWindow && (status.isSyncing || entry.syncMode == .offline)
-                               ? Color.accentColor
-                               : Color.secondary)
-                    )
+                    .foregroundStyle(status.foregroundColor(isSelected: selected, isKeyWindow: isKeyWindow))
             }
         }
         .padding(.horizontal, 10)
@@ -575,6 +566,11 @@ struct FileBrowserView: View {
                 entries: entries
             )
         }
+        .accessibilityElement(children: renaming ? .contain : .combine)
+        .accessibilityLabel(Text(entry.name))
+        .accessibilityValue(Text(selected ? "Selected" : "Not selected"))
+        .accessibilityAction(named: Text("Open")) { Task { await model.openEntry(entry) } }
+        .accessibilityAction(named: Text("Select")) { model.selectOnly(entry.id) }
     }
 
     private func iconBackground(for entry: FileEntry) -> Color {
@@ -599,18 +595,18 @@ struct FileBrowserView: View {
     private func multiSelectContextMenu(ids: Set<String>, entries: [FileEntry]) -> some View {
         let selected = entries.filter { ids.contains($0.id) }
         if selected.count == 1, let entry = selected.first {
-            Button(entry.isDirectory ? "Open Folder" : "Open") {
+            Button(LocalizedStringKey(entry.isDirectory ? "Open Folder" : "Open")) {
                 Task { await model.openEntry(entry) }
             }
             Button("Rename") {
                 model.requestRename(entry)
             }
             if entry.isDirectory {
-                Button(model.isFavorite(entry.relativePath) ? "Remove from Favorites" : "Add to Favorites") {
+                Button(LocalizedStringKey(model.isFavorite(entry.relativePath) ? "Remove from Favorites" : "Add to Favorites")) {
                     model.toggleFavorite(entry.relativePath)
                 }
             }
-            Button(entry.syncMode == .offline ? "Keep Online Only" : "Keep on This Mac") {
+            Button(LocalizedStringKey(entry.syncMode == .offline ? "Keep Online Only" : "Keep on This Mac")) {
                 Task { await model.togglePin(entry) }
             }
             .disabled(model.isActivelySyncing(entry.relativePath))
