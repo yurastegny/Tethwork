@@ -193,13 +193,17 @@ actor SyncEngine {
     /// Deterministic sync tests can drive reconciliation without filesystem callbacks.
     private let watchesDirectories: Bool
     private let homeDirectory: URL
+    private let inventoryDirectory: URL?
+    private var localInventory: LocalFileInventory?
     /// Pause between file copies so Finder-style browsing can use the share.
     private let syncTransferGapNs: UInt64 = 150_000_000
     private let syncMetadataGapNs: UInt64 = 25_000_000
 
-    init(watchesDirectories: Bool = true, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
+    init(watchesDirectories: Bool = true, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+         inventoryDirectory: URL? = nil) {
         self.watchesDirectories = watchesDirectories
         self.homeDirectory = homeDirectory
+        self.inventoryDirectory = inventoryDirectory ?? (watchesDirectories ? LocalFileInventory.defaultDirectory : nil)
     }
 
     func setEventHandler(_ handler: @escaping @Sendable (SyncEvent) -> Void) {
@@ -225,15 +229,36 @@ actor SyncEngine {
         await disconnectCurrentConnection(epoch: epoch)
         guard epoch == connectionEpoch else { throw CancellationError() }
 
+        if let directory = inventoryDirectory {
+            let prepared = await Task.detached(priority: .utility) { () -> LocalFileInventory? in
+                let inventory = LocalFileInventory(directory: directory, connection: connection)
+                do {
+                    try inventory.beginSession(selectedPaths: pinned)
+                    try inventory.auditBeforeSync()
+                    return inventory
+                } catch {
+                    NSLog("Tethwork local inventory unavailable: %@", error.localizedDescription)
+                    return nil
+                }
+            }.value
+            guard epoch == connectionEpoch else { throw CancellationError() }
+            localInventory = prepared
+        }
         let homeDirectory = self.homeDirectory
-        try await Task.detached(priority: .userInitiated) {
-            try Self.validateConnectionSafety(connection, homeDirectory: homeDirectory)
-            guard Self.rootsAreDisjoint(connection.remotePath, connection.localPath) else {
-                throw SyncError.overlappingRoots
-            }
-            try Self.validateRemoteRoot(connection.remotePath)
-            try FileManager.default.createDirectory(atPath: connection.localPath, withIntermediateDirectories: true)
-        }.value
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try Self.validateConnectionSafety(connection, homeDirectory: homeDirectory)
+                guard Self.rootsAreDisjoint(connection.remotePath, connection.localPath) else {
+                    throw SyncError.overlappingRoots
+                }
+                try Self.validateRemoteRoot(connection.remotePath)
+                try FileManager.default.createDirectory(atPath: connection.localPath, withIntermediateDirectories: true)
+            }.value
+        } catch {
+            guard epoch == connectionEpoch else { throw CancellationError() }
+            inventoryNote("connection_rejected", message: error.localizedDescription)
+            throw error
+        }
         guard epoch == connectionEpoch else { throw CancellationError() }
         self.connection = connection
         self.initialMergePending = deferInitialMerge
@@ -272,6 +297,8 @@ actor SyncEngine {
         consecutiveSyncFailures = 0
         retryNotBefore = .distantPast
         persistSyncState()
+        inventoryCheckpoint(force: true)
+        localInventory = nil
         connection = nil
         remoteWasUnavailable = false
         initialMergePending = false
@@ -333,8 +360,12 @@ actor SyncEngine {
                 // Removing a local copy is not a Finder deletion. Persist the updated
                 // baseline before eviction, without rescanning unrelated remote trees.
                 persistSyncState()
+                inventoryNote("local_removal_requested", message: "Keep Online Only", paths: [normalized])
                 emit(.init(kind: .status, message: "Freeing local space: \(normalized.isEmpty ? "/" : normalized)", path: normalized))
                 try await removeLocalTree(normalized)
+                guard epoch == connectionEpoch, revision == syncRevision else { throw CancellationError() }
+                inventoryRetire(normalized, reason: "Explicit Keep Online Only completed", remainingSelections: Array(pinnedPaths))
+                inventoryCheckpoint(force: true, successfulOperation: "Keep Online Only")
             }
 
             guard epoch == connectionEpoch, revision == syncRevision else { throw CancellationError() }
@@ -404,6 +435,8 @@ actor SyncEngine {
 
         do {
             let pins = pinnedPaths.sorted()
+            await auditLocalInventory()
+            guard epoch == connectionEpoch, revision == syncRevision else { return false }
             try Self.validateConnectionSafety(connection, homeDirectory: homeDirectory)
             try Self.validateRemoteRoot(connection.remotePath)
             try reportRemoteRecovery(connection)
@@ -483,6 +516,7 @@ actor SyncEngine {
 
         let pins = pinnedPaths
         let remoteRoot = connection.remotePath
+        inventoryNote("trash_requested", message: "Explicit Move to Trash", paths: relativePaths)
         // TrashStore performs directory walks and SMB moves. Keep them off the
         // actor so directory listing and navigation do not freeze.
         let outcome = await Task.detached(priority: .userInitiated) {
@@ -501,6 +535,7 @@ actor SyncEngine {
             if fm.fileExists(atPath: local) {
                 do {
                     try stageLocalTrashCleanup(local, localRoot: connection.localPath)
+                    inventoryRetire(normalized, reason: "Explicit Move to Trash completed")
                 } catch {
                     failures.append("\(normalized) (local copy: \(error.localizedDescription))")
                 }
@@ -3230,6 +3265,8 @@ actor SyncEngine {
         var syncPath = ""
         var syncOperation = "Automatic synchronization"
         do {
+            await auditLocalInventory()
+            guard epoch == connectionEpoch, revision == syncRevision else { return }
             try Self.validateConnectionSafety(connection, homeDirectory: homeDirectory)
             try Self.validateRemoteRoot(connection.remotePath)
             try reportRemoteRecovery(connection)
@@ -3357,6 +3394,31 @@ actor SyncEngine {
         return (connection.localPath as NSString).appendingPathComponent(".tethwork-sync-state.json")
     }
 
+    // Diagnostic metadata only. Inventory failures never authorize deletion or
+    // change the sync baseline; the problem is retained in the system log.
+    private func inventoryNote(_ kind: String, message: String? = nil, paths: [String]? = nil) {
+        do { try localInventory?.note(kind: kind, message: message, paths: paths) }
+        catch { NSLog("Tethwork inventory journal failed: %@", error.localizedDescription) }
+    }
+
+    private func inventoryCheckpoint(force: Bool = false, successfulOperation: String? = nil) {
+        do {
+            try localInventory?.checkpoint(force: force, successfulOperation: successfulOperation,
+                                           selectedPaths: connection == nil ? nil : pinnedPaths.sorted())
+        } catch { NSLog("Tethwork inventory checkpoint failed: %@", error.localizedDescription) }
+    }
+
+    private func inventoryRetire(_ scope: String, reason: String, remainingSelections: [String] = []) {
+        do { try localInventory?.retire(scope: scope, reason: reason, remainingSelections: remainingSelections) }
+        catch { NSLog("Tethwork inventory removal record failed: %@", error.localizedDescription) }
+    }
+
+    private func auditLocalInventory() async {
+        guard let inventory = localInventory else { return }
+        do { try await Task.detached(priority: .utility) { try inventory.auditBeforeSync() }.value }
+        catch { NSLog("Tethwork inventory audit failed: %@", error.localizedDescription) }
+    }
+
     /// Separate from the deletion baseline: checkpointing a partial scan must
     /// never mark unvisited paths as synchronized or deleted.
     private func loadVerificationCache(for connection: SyncConnection) {
@@ -3388,6 +3450,8 @@ actor SyncEngine {
     }
 
     private func recordVerifiedPair(_ pair: VerifiedPair, path: String) {
+        localInventory?.confirm(path: path, size: pair.localSize, modified: pair.localModified, fileID: pair.localFileID)
+        inventoryCheckpoint()
         guard verifiedPairs[path] != pair else { return }
         verifiedPairs[path] = pair
         verificationCacheDirty = true
@@ -3427,6 +3491,8 @@ actor SyncEngine {
     private func persistSyncState() {
         persistVerificationCache()
         guard let connection, let path = syncStatePath else { return }
+        localInventory?.addExpected(paths: knownSyncedPaths)
+        inventoryCheckpoint()
         let state = PersistedSyncState(
             remotePath: Self.canonicalPath(connection.remotePath),
             syncedPaths: knownSyncedPaths.sorted()
@@ -3543,9 +3609,11 @@ actor SyncEngine {
     /// tells the UI why the file disappeared.
     private func forgetTrashedLocalCopy(_ localPath: String, relativePath: String) throws {
         let normalized = Self.normalize(relativePath)
+        inventoryNote("local_removal_requested", message: "A shared Trash record matched a previously synchronized file", paths: [normalized])
         if fm.fileExists(atPath: localPath) {
             try fm.removeItem(atPath: localPath)
         }
+        inventoryNote("local_removal_completed", message: "Shared Trash reconciliation", paths: [normalized])
         removeKnownPath(normalized)
         var pinsChanged = false
         if !normalized.isEmpty {
@@ -3657,6 +3725,8 @@ actor SyncEngine {
     }
 
     private func remapKnownPaths(from source: String, to destination: String) {
+        do { try localInventory?.remap(from: source, to: destination) }
+        catch { NSLog("Tethwork inventory remap failed: %@", error.localizedDescription) }
         var updated = Set<String>()
         for path in knownSyncedPaths {
             if path == source {
@@ -3684,6 +3754,12 @@ actor SyncEngine {
 
     private func emit(_ event: SyncEvent) {
         var event = event
+        if event.kind == .complete {
+            localInventory?.addExpected(paths: knownSyncedPaths)
+            inventoryCheckpoint(force: true, successfulOperation: event.message)
+        } else if event.kind == .error || event.kind == .file || event.kind == .trash {
+            inventoryNote("engine_\(String(describing: event.kind))", message: event.message, paths: event.path.map { [$0] })
+        }
         if event.kind == .complete || event.kind == .error || event.phase == .preparing {
             lastUploadRate = nil
             lastDownloadRate = nil

@@ -45,7 +45,7 @@ private final class Fixture {
         root = base.appendingPathComponent("sync-test-\(UUID().uuidString)")
         remote = root.appendingPathComponent("remote")
         local = root.appendingPathComponent("local")
-        engine = SyncEngine(watchesDirectories: watchChanges)
+        engine = SyncEngine(watchesDirectories: watchChanges, inventoryDirectory: root.appendingPathComponent("inventory"))
         try fm.createDirectory(at: remote, withIntermediateDirectories: true)
         try fm.createDirectory(at: local, withIntermediateDirectories: true)
     }

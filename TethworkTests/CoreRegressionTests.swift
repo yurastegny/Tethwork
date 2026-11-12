@@ -50,7 +50,7 @@ final class CoreRegressionTests: XCTestCase {
 
     func testBundleVersionAndReleaseChannel() {
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "0.0.1")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "3")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "5")
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "TethworkReleaseChannel") as? String, "beta")
     }
 
@@ -72,6 +72,26 @@ final class CoreRegressionTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(largest.colorAt(x: 0, y: 0)).alphaComponent, 0,
                        "Keep the system-generated transparent margins instead of exporting an edge-to-edge square")
         XCTAssertGreaterThan(try XCTUnwrap(largest.colorAt(x: 512, y: 512)).alphaComponent, 0)
+    }
+
+    @MainActor
+    func testDockIconInsetsTheWholeTileWithoutChangingItsSource() throws {
+        let source = NSImage(size: NSSize(width: 1024, height: 1024), flipped: false) { rect in
+            NSColor.cyan.setFill()
+            rect.fill()
+            return true
+        }
+        let image = DockIcon.image(from: source)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: XCTUnwrap(image.tiffRepresentation)))
+        XCTAssertEqual(image.size, source.size)
+        XCTAssertEqual(bitmap.pixelsWide, 1024)
+        XCTAssertEqual(bitmap.pixelsHigh, 1024)
+        XCTAssertEqual(try XCTUnwrap(bitmap.colorAt(x: 16, y: 512)).alphaComponent, 0)
+        XCTAssertEqual(try XCTUnwrap(bitmap.colorAt(x: 1007, y: 512)).alphaComponent, 0)
+        XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 40, y: 512)).alphaComponent, 0.99)
+        XCTAssertGreaterThan(try XCTUnwrap(bitmap.colorAt(x: 983, y: 512)).alphaComponent, 0.99)
+        let original = try XCTUnwrap(NSBitmapImageRep(data: XCTUnwrap(source.tiffRepresentation)))
+        XCTAssertGreaterThan(try XCTUnwrap(original.colorAt(x: 16, y: 512)).alphaComponent, 0.99)
     }
 
     @MainActor

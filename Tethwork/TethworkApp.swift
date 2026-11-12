@@ -5,6 +5,10 @@ final class TethworkApplicationDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSLog("Tethwork launched (pid %d)", ProcessInfo.processInfo.processIdentifier)
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
+           let icon = NSImage(named: "AppIcon") {
+            NSApplication.shared.applicationIconImage = DockIcon.image(from: icon)
+        }
         updater?.start()
     }
 

@@ -9,10 +9,10 @@ A native macOS **SwiftUI** app — a network volume browser with selective sync.
 [Release notes and versions](https://github.com/yurastegny/Tethwork/releases)
 
 > [!CAUTION]
-> **Downloads temporarily suspended.** Data loss was reported after running build 2
-> with iCloud Drive as a sync folder. Quit Tethwork and do not use it with iCloud
-> Drive or other cloud-managed folders while this issue is investigated. If you
-> already use it, keep independent copies of recovered files before restarting.
+> **iCloud synchronization is blocked.** Build 5 rejects iCloud Drive and other
+> cloud-managed sync roots, including saved connections. The local file inventory
+> does not enable iCloud synchronization. Data loss was reported after a reinstall;
+> the cause of that incident has not been established. Keep independent backups.
 
 > [!WARNING]
 > **Beta software — use at your own risk.** Synchronization can overwrite or delete
@@ -109,6 +109,41 @@ blocked until a failed initial adoption has been retried successfully.
 Use **View → Show Hidden Files** (⌘⇧.) to browse user dotfiles such as `.env` or
 `.hy2test`. Internal Tethwork state, Trash and staging files remain hidden. This
 visibility setting does not exclude dotfiles from synchronization.
+
+## Local file inventory (build 5)
+
+Tethwork keeps a diagnostic record of expected local paths for each connection in
+`~/Library/Application Support/Tethwork/LocalInventory`. **Settings → Open local
+file inventory** opens this folder. It is outside the app bundle and sync roots:
+replacing the application does not remove it. Deleting Application Support does.
+
+- `<key>.json`: current expected paths, known sizes, modification times, file IDs,
+  confirmation times, selected paths and last successful operation. The SHA-256
+  key separates connection IDs and root pairs. Imported legacy expectations can
+  lack metadata or a confirmation time; directories can also appear in the list.
+- `<key>.previous.json`: the immediately preceding complete snapshot.
+- `<key>.events.jsonl`: append-only events with ISO-8601 timestamps, including
+  session/build information, selection changes, operations and pre-sync audits.
+  Audits distinguish missing paths, cloud-only placeholders, access errors and an
+  unavailable root. Explicit completed eviction/Trash actions retire expectations
+  while retaining their metadata in the journal. Renames remap expected paths.
+
+Changing saved selections, an incomplete pass or an absent file does not erase
+expectations. Valid legacy sync-state and verification-cache metadata seed the
+first snapshot. New verified files are checkpointed about every five seconds and
+at operation completion/disconnection; an abrupt crash can lose recent additions.
+
+This is **diagnostic metadata, not a backup or a synchronization baseline**. It
+never restores or deletes user files and does not change synchronization rules or
+unblock cloud roots. It cannot reconstruct an incident predating installation,
+identify which external program removed a file, or guarantee a consistent audit
+while other programs are changing files. Inventory failures are logged to the
+macOS system log and do not stop synchronization; corrupt snapshots are not
+silently replaced. Journals are not automatically pruned, so their size can grow.
+
+No document contents are recorded. Paths, root names, file metadata and error
+messages can still be sensitive: the registry directory is created with
+owner-only permissions. Back it up separately and review it before sharing.
 
 ## Reconciliation and safety
 

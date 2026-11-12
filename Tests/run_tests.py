@@ -21,7 +21,7 @@ import tempfile
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--suite", choices=["all", "engine", "merge", "trash", "unpin", "favorites", "watcher", "coordinator", "startup"], default="all")
+    parser.add_argument("--suite", choices=["all", "inventory", "engine", "merge", "trash", "unpin", "favorites", "watcher", "coordinator", "startup"], default="all")
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--sanitize-thread", action="store_true")
     parser.add_argument("--compile-timeout", type=float, default=120)
@@ -38,9 +38,11 @@ def main():
         "Tethwork/Models/Models.swift",
         "Tethwork/Sync/DirectoryWatcher.swift",
         "Tethwork/Sync/TrashStore.swift",
+        "Tethwork/Services/LocalFileInventory.swift",
         "Tethwork/Sync/SyncEngine.swift",
     ]
     suites = {
+        "inventory": common + ["Tests/LocalFileInventoryTests.swift"],
         "engine": common + ["Tests/SyncEngineTests.swift"],
         "merge": common + ["Tests/InitialMergeTests.swift"],
         "trash": common + ["Tests/TrashStoreTests.swift"],

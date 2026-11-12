@@ -13,7 +13,7 @@ settings:
     SWIFT_VERSION: "5.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     MARKETING_VERSION: "0.0.1"
-    CURRENT_PROJECT_VERSION: "3"
+    CURRENT_PROJECT_VERSION: "5"
 packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
@@ -51,6 +51,9 @@ targets:
       configs:
         Release:
           ENABLE_HARDENED_RUNTIME: true
+          DEVELOPMENT_TEAM: 4Y3FA3437G
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application: Iurii Stegnii (4Y3FA3437G)"
   TethworkTests:
     type: bundle.unit-test
     platform: macOS

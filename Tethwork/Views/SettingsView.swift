@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     var body: some View {
@@ -100,6 +101,10 @@ private struct AboutSettingsTab: View {
         Form {
             Section("About") {
                 LabeledContent("Version", value: displayVersion)
+                Button("Open local file inventory") {
+                    NSWorkspace.shared.open(LocalFileInventory.defaultDirectory)
+                }
+                .disabled(!FileManager.default.fileExists(atPath: LocalFileInventory.defaultDirectory.path))
                 Text("Tethwork is a Finder-like browser for network volumes with selective two-way sync.")
                     .foregroundStyle(.secondary)
                     .font(.callout)
