@@ -50,7 +50,7 @@ final class CoreRegressionTests: XCTestCase {
 
     func testBundleVersionAndReleaseChannel() {
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "0.0.1")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "2")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "3")
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "TethworkReleaseChannel") as? String, "beta")
     }
 

@@ -149,3 +149,4 @@
 "Completed: %lld%%" = "Завершено: %lld%%";
 "Deferred changing files: %lld" = "Изменяющиеся файлы: %lld — обработаются обычной синхронизацией";
 "Check for Updates…" = "Проверить обновления…";
+"Cloud-managed folders cannot be used as sync roots. Deleting a local copy can delete it from the cloud. Choose a dedicated folder outside iCloud Drive or other cloud storage." = "Облачные папки нельзя использовать как корень синхронизации. Удаление локальной копии может удалить файл и из облака. Выберите отдельную папку вне iCloud Drive и других облачных хранилищ.";

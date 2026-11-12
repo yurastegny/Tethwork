@@ -192,12 +192,14 @@ actor SyncEngine {
     private let fm = FileManager.default
     /// Deterministic sync tests can drive reconciliation without filesystem callbacks.
     private let watchesDirectories: Bool
+    private let homeDirectory: URL
     /// Pause between file copies so Finder-style browsing can use the share.
     private let syncTransferGapNs: UInt64 = 150_000_000
     private let syncMetadataGapNs: UInt64 = 25_000_000
 
-    init(watchesDirectories: Bool = true) {
+    init(watchesDirectories: Bool = true, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
         self.watchesDirectories = watchesDirectories
+        self.homeDirectory = homeDirectory
     }
 
     func setEventHandler(_ handler: @escaping @Sendable (SyncEvent) -> Void) {
@@ -223,7 +225,9 @@ actor SyncEngine {
         await disconnectCurrentConnection(epoch: epoch)
         guard epoch == connectionEpoch else { throw CancellationError() }
 
+        let homeDirectory = self.homeDirectory
         try await Task.detached(priority: .userInitiated) {
+            try Self.validateConnectionSafety(connection, homeDirectory: homeDirectory)
             guard Self.rootsAreDisjoint(connection.remotePath, connection.localPath) else {
                 throw SyncError.overlappingRoots
             }
@@ -400,6 +404,7 @@ actor SyncEngine {
 
         do {
             let pins = pinnedPaths.sorted()
+            try Self.validateConnectionSafety(connection, homeDirectory: homeDirectory)
             try Self.validateRemoteRoot(connection.remotePath)
             try reportRemoteRecovery(connection)
 
@@ -424,9 +429,8 @@ actor SyncEngine {
                 try await syncTree(pin)
             }
             guard epoch == connectionEpoch, revision == syncRevision, !initialMergePending else { return false }
-            syncOperation = "Prune local cache"
-            syncPath = ""
-            try await pruneUnpinnedLocal()
+            // A settings reload or missing pin is never consent to delete data.
+            // Eviction is only performed by the explicit Keep Online Only action.
             syncOperation = "Refresh synchronization baseline"
             emit(.init(kind: .progress, message: String(localized: "Finishing synchronization…"),
                        path: nil, progressDone: syncTransferDone,
@@ -851,6 +855,7 @@ actor SyncEngine {
 
     private func writableConnection() throws -> SyncConnection {
         guard let connection else { throw SyncError.notConnected }
+        try Self.validateConnectionSafety(connection, homeDirectory: homeDirectory)
         guard !initialMergePending else {
             throw SyncError.invalidMove("Local files are still being merged. Please wait before changing files or local storage.")
         }
@@ -947,6 +952,7 @@ actor SyncEngine {
         onProgress: (@Sendable (Int, Int, String) -> Void)? = nil
     ) async throws -> [String] {
         let task = Task.detached(priority: .utility) {
+            try validateConnectionSafety(connection)
             onSnapshot?(.init(phase: .preparing, filesDone: 0, filesTotal: 0, bytesDone: 0,
                               bytesTotal: nil, currentPath: "", bytesPerSecond: nil, estimatedSecondsRemaining: nil))
             guard rootsAreDisjoint(connection.remotePath, connection.localPath) else {
@@ -2756,36 +2762,6 @@ actor SyncEngine {
         try fm.removeItem(atPath: local)
     }
 
-    private func pruneUnpinnedLocal() async throws {
-        guard let connection else { return }
-        try walkAndPrune(absPath: connection.localPath, relativePath: "")
-    }
-
-    private func walkAndPrune(absPath: String, relativePath: String) throws {
-        guard fm.fileExists(atPath: absPath) else { return }
-        let attrs = try fm.attributesOfItem(atPath: absPath)
-        let isDir = (attrs[.type] as? FileAttributeType) == .typeDirectory
-
-        if !isDir {
-            // Untracked local files may have appeared during initial adoption.
-            // Never treat them as disposable cached copies.
-            if !shouldKeepLocal(relativePath), knownSyncedPaths.contains(relativePath) {
-                try fm.removeItem(atPath: absPath)
-            }
-            return
-        }
-
-        let entries = try fm.contentsOfDirectory(atPath: absPath).filter { !Self.isInternalImportName($0) }
-        for name in entries {
-            let childRel = relativePath.isEmpty ? name : "\(relativePath)/\(name)"
-            try walkAndPrune(absPath: join(absPath, name), relativePath: childRel)
-        }
-        if !relativePath.isEmpty, !shouldKeepLocal(relativePath), !hasPinnedDescendant(relativePath),
-           knownSyncedPaths.contains(relativePath), try fm.contentsOfDirectory(atPath: absPath).isEmpty {
-            try fm.removeItem(atPath: absPath)
-        }
-    }
-
     private func copyPath(
         from: String,
         to: String,
@@ -3254,6 +3230,7 @@ actor SyncEngine {
         var syncPath = ""
         var syncOperation = "Automatic synchronization"
         do {
+            try Self.validateConnectionSafety(connection, homeDirectory: homeDirectory)
             try Self.validateRemoteRoot(connection.remotePath)
             try reportRemoteRecovery(connection)
             for pin in pinnedPaths.sorted() {
@@ -3790,6 +3767,33 @@ actor SyncEngine {
         }.sorted()
     }
 
+    /// Cloud-managed directories are authoritative user data, not disposable
+    /// cache roots. Refuse them before creating directories, loading baselines,
+    /// starting watchers, adopting files or allowing any mutation.
+    nonisolated static func validateConnectionSafety(_ connection: SyncConnection,
+                                                     homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) throws {
+        let protected = ["Library/Mobile Documents", "Library/CloudStorage"].map {
+            canonicalPath(homeDirectory.appendingPathComponent($0).path)
+        }
+        for path in [connection.localPath, connection.remotePath] {
+            let candidate = canonicalPath(path)
+            if protected.contains(where: { root in
+                candidate == root || candidate.hasPrefix(root + "/") || root.hasPrefix(candidate + "/")
+            }) {
+                throw SyncError.cloudManagedRoot(path)
+            }
+            // Also catch ubiquitous Documents/Desktop folders outside the
+            // conventional paths. Check an existing ancestor for new folders.
+            var existing = URL(fileURLWithPath: candidate)
+            while existing.path != "/", !FileManager.default.fileExists(atPath: existing.path) {
+                existing.deleteLastPathComponent()
+            }
+            if try existing.resourceValues(forKeys: [.isUbiquitousItemKey]).isUbiquitousItem == true {
+                throw SyncError.cloudManagedRoot(path)
+            }
+        }
+    }
+
     nonisolated private static func validateRemoteRoot(_ path: String) throws {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
@@ -3829,6 +3833,7 @@ enum SyncError: LocalizedError {
     case notFound(String)
     case invalidMove(String)
     case overlappingRoots
+    case cloudManagedRoot(String)
 
     var errorDescription: String? {
         switch self {
@@ -3842,6 +3847,8 @@ enum SyncError: LocalizedError {
             return message
         case .overlappingRoots:
             return String(localized: "The network and local folders must not be the same or contain one another.")
+        case .cloudManagedRoot(let path):
+            return String(localized: "Cloud-managed folders cannot be used as sync roots. Deleting a local copy can delete it from the cloud. Choose a dedicated folder outside iCloud Drive or other cloud storage.") + "\n" + path
         }
     }
 }

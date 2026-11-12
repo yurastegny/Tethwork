@@ -66,6 +66,19 @@ after editing the source, refresh them with `iconutil -c iconset` on the built
 
 ## How to Use
 
+**Do not choose iCloud Drive or another cloud-managed directory as either sync
+root.** Current sources reject iCloud/File Provider roots, their children,
+ancestors and resolved symlink aliases. This also blocks unsafe saved connections
+from older builds; it does not move or delete their files. Use a dedicated local
+folder outside cloud storage. Do not move recovered data until independent copies
+have been verified.
+
+Normal synchronization no longer deletes unselected local files simply because
+they appeared in an old sync baseline. Reloading/changing saved pins is not consent
+to evict data. Only the explicit **Keep Online Only** action evicts local copies
+in supported, non-cloud sync roots. Explicit deletion/Trash and conflict handling
+remain separate operations; keep backups.
+
 1. Mount a network volume in Finder → Connect to Server… (`/Volumes/...`).
 2. In Tethwork, click **New Connection…**.
 3. Choose the network volume and a local sync folder.

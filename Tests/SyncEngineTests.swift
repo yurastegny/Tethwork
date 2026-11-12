@@ -1201,6 +1201,29 @@ struct SyncEngineTests {
                 let items = await f.engine.listTrashItems()
                 try expect(items.count == 1 && items[0].isDirectory, "Empty directory deletion was lost")
             },
+            Case(name: "reloading pins never automatically evicts previously synchronized local files") { f in
+                try f.write(f.remote, "Work/Sub/file.txt", "preserve local copy")
+                try await f.connect(pins: ["Work"])
+                try await f.sync()
+                // A missing/reloaded pin preference is not an explicit eviction.
+                try await f.connect(pins: [])
+                try await f.sync()
+                try expect(f.exists(f.local, "Work/Sub/file.txt"),
+                           "A settings reload silently deleted a previously synchronized local file")
+                try expect(try f.read(f.local, "Work/Sub/file.txt") == "preserve local copy", "Local content changed")
+                try expect(f.exists(f.remote, "Work/Sub/file.txt"), "The server copy changed")
+            },
+            Case(name: "automatic sync never prunes unselected local edits") { f in
+                try f.write(f.remote, "Work/file.txt", "server original")
+                try await f.connect(pins: ["Work"])
+                try await f.sync()
+                try await f.connect(pins: [])
+                try f.write(f.local, "Work/file.txt", "unuploaded local edit")
+                try await f.sync()
+                try expect(f.exists(f.local, "Work/file.txt"), "Automatic pruning deleted an unuploaded local edit")
+                try expect(try f.read(f.local, "Work/file.txt") == "unuploaded local edit", "Local edit was overwritten")
+                try expect(try f.read(f.remote, "Work/file.txt") == "server original", "An unselected edit was uploaded")
+            },
             Case(name: "online-only eviction never trashes remote contents") { f in
                 try f.write(f.remote, "Work/file.txt", "keep remotely")
                 try await f.connect(pins: ["Work"])
@@ -1278,6 +1301,43 @@ struct SyncEngineTests {
                 try expect(!f.fm.fileExists(atPath: f.remote.path), "Sync recreated the missing network root")
                 try expect(f.events.snapshot().contains { $0.kind == .error && $0.isRemoteUnavailable },
                            "Missing server did not report unavailability")
+            },
+            Case(name: "cloud-managed local roots are rejected before creation or state writes") { f in
+                let home = f.root.appendingPathComponent("home")
+                let cloud = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
+                try f.fm.createDirectory(at: cloud, withIntermediateDirectories: true)
+                let engine = SyncEngine(watchesDirectories: false, homeDirectory: home)
+                let local = cloud.appendingPathComponent("MustNotCreate")
+                let connection = SyncConnection(name: "Unsafe cloud", remotePath: f.remote.path, localPath: local.path)
+                do {
+                    try await engine.connect(connection: connection, pinned: [])
+                    throw TestFailure(description: "A cloud-managed local root was accepted")
+                } catch SyncError.cloudManagedRoot { }
+                try expect(!f.exists(cloud, "MustNotCreate"), "Rejected connection created a cloud directory")
+                try expect(!f.exists(cloud, ".tethwork-sync-state.json"), "Rejected connection wrote cloud sync state")
+            },
+            Case(name: "cloud roots, ancestors and symlink aliases are rejected on either side") { f in
+                let home = f.root.appendingPathComponent("home")
+                let cloud = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
+                let provider = home.appendingPathComponent("Library/CloudStorage/Provider")
+                try f.fm.createDirectory(at: cloud, withIntermediateDirectories: true)
+                try f.fm.createDirectory(at: provider, withIntermediateDirectories: true)
+                let alias = f.root.appendingPathComponent("cloud-alias")
+                try f.fm.createSymbolicLink(at: alias, withDestinationURL: cloud)
+                for unsafe in [cloud, cloud.appendingPathComponent("new/subfolder"), provider,
+                               provider.appendingPathComponent("new/subfolder"), home, alias] {
+                    for unsafeIsLocal in [true, false] {
+                        let connection = SyncConnection(name: "Unsafe", remotePath: unsafeIsLocal ? f.remote.path : unsafe.path,
+                                                        localPath: unsafeIsLocal ? unsafe.path : f.local.path)
+                        do {
+                            try SyncEngine.validateConnectionSafety(connection, homeDirectory: home)
+                            throw TestFailure(description: "A cloud path or ancestor escaped the safety guard: \(unsafe.path)")
+                        } catch SyncError.cloudManagedRoot { }
+                    }
+                }
+                let sibling = home.appendingPathComponent("Library/CloudStorage-Archive")
+                try SyncEngine.validateConnectionSafety(
+                    SyncConnection(name: "Ordinary folder", remotePath: f.remote.path, localPath: sibling.path), homeDirectory: home)
             },
             Case(name: "overlapping sync roots are rejected") { f in
                 let invalid = SyncConnection(name: "Invalid", remotePath: f.remote.path,
