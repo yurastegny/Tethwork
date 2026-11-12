@@ -8,6 +8,12 @@ A native macOS **SwiftUI** app — a network volume browser with selective sync.
 
 [Release notes and versions](https://github.com/yurastegny/Tethwork/releases)
 
+> [!CAUTION]
+> **Downloads temporarily suspended.** Data loss was reported after running build 2
+> with iCloud Drive as a sync folder. Quit Tethwork and do not use it with iCloud
+> Drive or other cloud-managed folders while this issue is investigated. If you
+> already use it, keep independent copies of recovered files before restarting.
+
 > [!WARNING]
 > **Beta software — use at your own risk.** Synchronization can overwrite or delete
 > files on both your Mac and the network volume. Keep independent, tested backups
